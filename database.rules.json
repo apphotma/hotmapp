@@ -1,0 +1,190 @@
+{
+  "rules": {
+    "users": {
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId",
+        "friendRequests": {
+          "$fromUid": {
+            ".read": "auth != null && auth.uid === $userId",
+            ".write": "auth != null && (auth.uid === $userId || auth.uid === $fromUid)"
+          }
+        },
+        "sentRequests": {
+          "$toUid": {
+            ".read": "auth != null && auth.uid === $userId",
+            ".write": "auth != null && (auth.uid === $userId || auth.uid === $toUid)"
+          }
+        },
+        "customerList": {
+          "$otherUid": {
+            ".read": "auth != null && (auth.uid === $userId || auth.uid === $otherUid)",
+            ".write": "auth != null && (auth.uid === $userId || auth.uid === $otherUid)"
+          }
+        },
+        "customerHistory": {
+          "$otherUid": {
+            ".read": "auth != null && (auth.uid === $userId || auth.uid === $otherUid)",
+            ".write": "auth != null && (auth.uid === $userId || auth.uid === $otherUid)"
+          }
+        },
+        "chatList": {
+          "$chatId": {
+            ".read": "auth != null && auth.uid === $userId",
+            ".write": "auth != null && (auth.uid === $userId || auth.uid === $chatId || ($chatId.beginsWith('group_') && root.child('groups/' + $chatId + '/members/' + auth.uid).exists() && root.child('groups/' + $chatId + '/members/' + $userId).exists()))"
+          }
+        },
+        "$otherKey": {
+          ".read": "auth != null && auth.uid === $userId",
+          ".write": "auth != null && auth.uid === $userId"
+        }
+      }
+    },
+    "publicProfiles": {
+      ".read": "true",
+      ".indexOn": ["phoneNumber"],
+      "$userId": {
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "messages": {
+      "$chatId": {
+        ".read": "auth != null && ($chatId.contains(auth.uid) || root.child('groups/' + $chatId + '/members/' + auth.uid).exists())",
+        "$messageId": {
+          ".write": "auth != null && ($chatId.contains(auth.uid) || root.child('groups/' + $chatId + '/members/' + auth.uid).exists())"
+        }
+      }
+    },
+    "groups": {
+      "$groupId": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('members/' + auth.uid).exists()) || (data.exists() && (data.child('members/' + auth.uid).exists() || data.child('admins/' + auth.uid).exists())))"
+      }
+    },
+    "calls": {
+      "$targetUid": {
+        ".read": "auth != null && (auth.uid === $targetUid || data.child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $targetUid",
+        "candidates": {
+          "$senderUid": {
+            ".read": "auth != null && (auth.uid === $targetUid || auth.uid === $senderUid)",
+            ".write": "auth != null && (auth.uid === $targetUid || auth.uid === $senderUid)"
+          }
+        },
+        "$senderUid": {
+          ".write": "auth != null && (auth.uid === $targetUid || auth.uid === $senderUid)"
+        }
+      }
+    },
+    "linkingSessions": {
+      "$sessionId": {
+        ".read": "true",
+        ".write": "true"
+      }
+    },
+    "invitationTokens": {
+      "$tokenId": {
+        ".read": "true",
+        ".write": "auth != null"
+      }
+    },
+    "invitations": {
+      ".read": "true",
+      "$token": {
+        ".write": "auth != null",
+        "clicks": {
+          ".write": "true"
+        },
+        "androidDownloads": {
+          ".write": "true"
+        }
+      }
+    },
+    "analytics": {
+      "$analyticId": {
+        ".read": "true",
+        ".write": "true"
+      }
+    },
+    "products": {
+      ".read": "true",
+      "$productId": {
+        "avgRating": {
+          ".write": "auth != null"
+        },
+        "reviewCount": {
+          ".write": "auth != null"
+        },
+        "$otherKey": {
+          ".write": "auth != null && (!data.exists() || root.child('products/' + $productId + '/ownerId').val() === auth.uid)"
+        }
+      }
+    },
+    "reviews": {
+      "$productId": {
+        ".read": "auth != null",
+        "$reviewId": {
+          ".write": "auth != null && (newData.child('userId').val() === auth.uid || data.child('userId').val() === auth.uid)"
+        }
+      }
+    },
+    "callLogs": {
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "sellerProducts": {
+      ".read": "true",
+      "$ownerId": {
+        ".write": "auth != null && auth.uid === $ownerId"
+      }
+    },
+    "orders": {
+      "$orderId": {
+        ".read": "auth != null && data.exists() && (data.child('buyerId').val() === auth.uid || data.child('sellerId').val() === auth.uid || (data.child('chatId').exists() && data.child('chatId').val().contains(auth.uid)) || (data.child('chatId').exists() && root.child('groups/' + data.child('chatId').val() + '/members/' + auth.uid).exists()))",
+        ".write": "auth != null && ((!data.exists() && (newData.child('buyerId').val() === auth.uid || newData.child('sellerId').val() === auth.uid)) || (data.exists() && (data.child('buyerId').val() === auth.uid || data.child('sellerId').val() === auth.uid || (data.child('chatId').exists() && data.child('chatId').val().contains(auth.uid)) || (data.child('chatId').exists() && root.child('groups/' + data.child('chatId').val() + '/members/' + auth.uid).exists()))))"
+      }
+    },
+    "bugReports": {
+      "$userId": {
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "featureRequests": {
+      "$userId": {
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "feedback": {
+      "$userId": {
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "problemReports": {
+      "$userId": {
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "supportTickets": {
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+    "businessReports": {
+      "$reportId": {
+        ".write": "auth != null && newData.child('reporterUid').val() === auth.uid"
+      }
+    },
+    "faqs": {
+      ".read": "true"
+    },
+    "helpArticles": {
+      ".read": "true"
+    },
+    "helpSync": {
+      ".read": "true"
+    }
+  }
+}

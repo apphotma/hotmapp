@@ -1,0 +1,9 @@
+{
+  "appId": "com.hotmapp.app",
+  "appName": "hotmapp",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "hotmapp.shop"
+  }
+}
