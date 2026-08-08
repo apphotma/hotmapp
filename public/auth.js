@@ -1,7 +1,7 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
-import { loginWithCustomToken, logoutUser, subscribeToAuthChanges, setAuthPersistence, setupRecaptcha, sendSmsCode } from './auth-service.js?v=1.1.4';
-import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js?v=1.1.4';
+import { loginWithCustomToken, logoutUser, subscribeToAuthChanges, setAuthPersistence, setupRecaptcha, sendSmsCode } from './auth-service.js?v=1.1.6';
+import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js?v=1.1.6';
 import { auth, db } from './firebase-config.js';
 import { ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { registerFcmToken, removeFcmToken } from './fcm-service.js';

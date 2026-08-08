@@ -5,7 +5,7 @@ import { pushHistoryState, removeHistoryState, replaceHistoryState, dismissHisto
 import { auth, db } from './firebase-config.js';
 import { debounce, getRelativeTime, compressImage, getAvatarUrl, isEditableTextMessage } from './utils.js'; // Import utilities
 import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
-import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.1.4';
+import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.1.6';
 import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages } from './cache-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { refreshStoreGrids } from './store.js';
@@ -5885,11 +5885,6 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                             <div class="order-status-confirmed" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; color: var(--brand-dark); font-weight: 700; font-size: 0.82rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 <i class="fa-solid fa-circle-check"></i> Order Confirmed
                             </div>`;
-                    } else if (!isSent && isInvoiceOrderMessage) {
-                        actionHtml = `
-                            <div class="order-action-container" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; text-align: center;">
-                                <button class="confirm-order-btn" data-msg-id="${msg.id}" style="width: 100%; background: var(--brand); color: white; border: none; padding: 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Confirm Order</button>
-                            </div>`;
                     }
                 }
 
@@ -5926,29 +5921,6 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 `;
 
                 let pdfPreviewHtml = '';
-                if (isPdf) {
-                    if (hasValidUrl) {
-                        const pdfContent = msg.thumbnailUrl ? `
-                            <div class="image-loader-wrapper" style="min-height: 100px;"><div class="spinner"></div><img src="${msg.thumbnailUrl}" class="pdf-thumbnail" alt="PDF Preview" onload="this.classList.add('loaded'); this.previousElementSibling.style.display='none';"></div>
-                        ` : `
-                            <div class="pdf-embed-container"><iframe src="${msg.url}#toolbar=0&navpanes=0" frameborder="0"></iframe></div>
-                        `;
-                        pdfPreviewHtml = `
-                            <div class="pdf-thumbnail-container" onclick="openPdfViewer('${msg.url}', '${msg.id}')">
-                                ${pdfContent}
-                                <div class="pdf-thumbnail-overlay"><i class="fa-solid fa-expand"></i> Tap to view full PDF</div>
-                            </div>
-                        `;
-                    } else {
-                        pdfPreviewHtml = `
-                            <div class="pdf-thumbnail-container">
-                                <div class="pdf-uploading-placeholder">
-                                    <span>Preview available after upload</span>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
 
                 contentHtml = `
                     <div class="document-container">

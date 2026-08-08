@@ -7,13 +7,13 @@ import {
     setupRecaptcha,
     verifyNewPhoneNumber,
     changeUserPhoneNumber
-} from './auth-service.js?v=1.1.4';
+} from './auth-service.js?v=1.1.6';
 import { 
     deleteUserProducts, 
     deleteFullUserProfile,
     updateUserProfile,
     getUserProfile
-} from './database-service.js?v=1.1.4';
+} from './database-service.js?v=1.1.6';
 import { hideElement, showElement } from './utils.js';
 
 export const initAccount = () => {

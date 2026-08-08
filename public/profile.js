@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js?v=1.1.4';
+import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js?v=1.1.6';
 import { showToast } from './toast.js';
 import { hideElement, showElement, getAvatarUrl, compressImage, cropToSquare } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';

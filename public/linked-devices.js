@@ -1,7 +1,7 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
 import { auth } from './firebase-config.js';
-import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js?v=1.1.4';
+import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js?v=1.1.6';
 import { db } from './firebase-config.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { getRelativeTime } from './utils.js';
