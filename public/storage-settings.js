@@ -6,7 +6,7 @@ import {
     getChatList, 
     deleteFile, 
     deleteMessagesBatch 
-} from './database-service.js?v=1.1.6';
+} from './database-service.js?v=1.1.8';
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';

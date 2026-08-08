@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
-import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.1.6';
+import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.1.8';
 import { auth, db } from './firebase-config.js';
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { subscribeToAuthChanges } from './auth-service.js';

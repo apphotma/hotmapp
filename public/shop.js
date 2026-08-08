@@ -5,7 +5,7 @@ import { debounce, calculateDistance, getHeuristicTravelTime, getTravelTimeFromA
 import { auth, db } from './firebase-config.js'; // Import db
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { openBusinessLocationPicker, openShopAccessRequestModal } from './store.js';
-import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.1.6';
+import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.1.8';
 import { getOrDeriveSharedKey, encryptText } from './crypto-helper.js';
 import { pushHistoryState, removeHistoryState, dismissHistoryState } from './history-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
