@@ -12,7 +12,7 @@ import {
     getHelpSyncMetadata,
     getHelpArticlesFromDb,
     getFaqsFromDb
-} from './database-service.js?v=1.0.7';
+} from './database-service.js?v=1.1.4';
 
 // Global State
 let panelHistory = [];

@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getUserProfile, updateUserProfile } from './database-service.js?v=1.0.7';
+import { getUserProfile, updateUserProfile } from './database-service.js?v=1.1.4';
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';

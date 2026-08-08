@@ -1101,6 +1101,20 @@ export const saveProduct = async (productId, productData) => {
     const id = productId || push(ref(db, 'products')).key;
     const productRef = ref(db, `products/${id}`);
 
+    // If updating, get ownerId from productData, auth, or query db/cache if needed
+    let ownerId = productData.ownerId || auth.currentUser?.uid;
+    if (!ownerId && productId) {
+        const cached = await getCachedItem('products', productId);
+        if (cached && cached.ownerId) {
+            ownerId = cached.ownerId;
+        } else {
+            const snap = await get(ref(db, `products/${productId}/ownerId`));
+            if (snap.exists()) {
+                ownerId = snap.val();
+            }
+        }
+    }
+
     const data = {
         ...productData,
         id: id,
@@ -1110,8 +1124,10 @@ export const saveProduct = async (productId, productData) => {
 
     if (!productId) data.createdAt = serverTimestamp();
     await update(productRef, data);
-    if (data.ownerId) {
-        await update(ref(db, `sellerProducts/${data.ownerId}/${id}`), data);
+    
+    if (ownerId) {
+        data.ownerId = ownerId;
+        await update(ref(db, `sellerProducts/${ownerId}/${id}`), data);
     }
     
     // Save to IndexedDB cache

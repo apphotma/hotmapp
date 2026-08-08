@@ -5,7 +5,7 @@ import { debounce, calculateDistance, getHeuristicTravelTime, getTravelTimeFromA
 import { auth, db } from './firebase-config.js'; // Import db
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { openBusinessLocationPicker, openShopAccessRequestModal } from './store.js';
-import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.0.7';
+import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.1.4';
 import { getOrDeriveSharedKey, encryptText } from './crypto-helper.js';
 import { pushHistoryState, removeHistoryState, dismissHistoryState } from './history-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
@@ -529,19 +529,27 @@ export const initShop = () => {
         if (!grid) return;
 
         grid.innerHTML = '';
-        const availableProducts = normalizedProducts.filter(p => !p?.soldOut);
         
-        if (availableProducts.length === 0) {
+        if (normalizedProducts.length === 0) {
             grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--muted); font-size: 0.95rem;">No products available in this shop.</div>';
             return;
         }
         
-        availableProducts.forEach(product => {
+        normalizedProducts.forEach(product => {
             const mainImg = product.images?.[0] || '';
             const imagesAttr = JSON.stringify(product.images || []);
             const priceHtml = `<span class="product-currency">${product.currency}</span>${parsePrice(product.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">ON THE WAY</div>' : '';
+            const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
+            const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
+            const btnHtml = product.soldOut 
+                ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6;">On the Way</button>'
+                : '<button class="add-to-cart-btn">Add to Cart</button>';
+
             const shopHtml = `
-                <div class="product-card" data-id="${product.id}" data-images=\'${imagesAttr}\'>
+                <div class="${cardClass}" data-id="${product.id}" data-images=\'${imagesAttr}\' ${cardStyle}>
+                    ${soldOutBadge}
                     <div class="image-loader-wrapper">
                         <div class="spinner"></div>
                         <img src="${mainImg}" alt="${product.name}" class="product-img" onload="this.classList.add(\'loaded\'); this.previousElementSibling.style.display=\'none\';">
@@ -554,7 +562,7 @@ export const initShop = () => {
                         <span class="product-quantity">Quantity: ${product.qty || ''}</span>
                         <div class="product-price">${priceHtml}</div>
                     </div>
-                    <button class="add-to-cart-btn">Add to Cart</button>
+                    ${btnHtml}
                 </div>`;
             grid.insertAdjacentHTML('beforeend', shopHtml);
         });
