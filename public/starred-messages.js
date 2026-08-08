@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getStarredMessages, clearAllStarredMessages, getUserProfile } from './database-service.js';
+import { getStarredMessages, clearAllStarredMessages, getUserProfile } from './database-service.js?v=1.0.7';
 import { showToast } from './toast.js';
 import { getOrDeriveSharedKey, decryptText } from './crypto-helper.js';
 

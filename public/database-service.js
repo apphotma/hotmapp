@@ -1,221 +1,45 @@
-import { io } from "https://cdn.socket.io/4.7.5/socket.io.esm.min.js";
+import { ref, set, get, child, update, push, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved, onValue, onDisconnect, increment, runTransaction, query, orderByChild, orderByKey, limitToLast, limitToFirst, endBefore, startAfter, startAt, endAt, equalTo } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+export { ref, set, get, child, update, push, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved, onValue, onDisconnect, increment, runTransaction, query, orderByChild, orderByKey, limitToLast, limitToFirst, endBefore, startAfter, startAt, endAt, equalTo };
 
-const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:3000' 
-    : 'https://api.hotmapp.shop';
-
-// Connect Socket.io client
-const socket = io(BACKEND_URL);
-
-class MockSnapshot {
-    constructor(key, val) {
-        this.key = key;
-        this._val = val;
-    }
-    val() { return this._val; }
-    exists() { return this._val !== null && this._val !== undefined; }
-}
-
-export const ref = (db, path = '') => {
-    return { path };
-};
-
-export const child = (parentRef, path) => {
-    const parentPath = parentRef.path || '';
-    return { path: parentPath ? `${parentPath}/${path}` : path };
-};
-
-export const get = async (refObj) => {
-    try {
-        const res = await fetch(`${BACKEND_URL}/api/db/get?path=${encodeURIComponent(refObj.path)}`);
-        const val = await res.json();
-        return new MockSnapshot(refObj.path.split('/').pop(), val);
-    } catch (e) {
-        console.error("Mock DB get error:", e);
-        return new MockSnapshot(null, null);
-    }
-};
-
-export const set = async (refObj, value) => {
-    try {
-        const res = await fetch(`${BACKEND_URL}/api/db/set`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: refObj.path, value })
-        });
-        return res.json();
-    } catch (e) {
-        console.error("Mock DB set error:", e);
-        return { success: false };
-    }
-};
-
-export const update = async (refObj, value) => {
-    try {
-        const res = await fetch(`${BACKEND_URL}/api/db/update`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: refObj.path, value })
-        });
-        return res.json();
-    } catch (e) {
-        console.error("Mock DB update error:", e);
-        return { success: false };
-    }
-};
-
-export const push = (refObj) => {
-    const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-    let now = Date.now();
-    let timeStampChars = new Array(8);
-    for (let i = 7; i >= 0; i--) {
-        timeStampChars[i] = PUSH_CHARS.charAt(now % 64);
-        now = Math.floor(now / 64);
-    }
-    let key = timeStampChars.join('');
-    for (let i = 0; i < 12; i++) {
-        key += PUSH_CHARS.charAt(Math.floor(Math.random() * 64));
-    }
-    const newPath = refObj.path ? `${refObj.path}/${key}` : key;
-    return {
-        key,
-        path: newPath
-    };
-};
-
-export const serverTimestamp = () => Date.now();
-export const increment = (amount) => amount;
-
-export const query = (refObj, ...constraints) => refObj;
-export const orderByKey = () => ({ type: 'orderByKey' });
-export const orderByChild = (path) => ({ type: 'orderByChild', path });
-export const startAfter = (val) => ({ type: 'startAfter', val });
-export const limitToLast = (val) => ({ type: 'limitToLast', val });
-export const limitToFirst = (val) => ({ type: 'limitToFirst', val });
-export const endBefore = (val) => ({ type: 'endBefore', val });
-export const startAt = (val) => ({ type: 'startAt', val });
-export const endAt = (val) => ({ type: 'endAt', val });
-export const equalTo = (val) => ({ type: 'equalTo', val });
-
-export const onChildAdded = (queryObj, callback) => {
-    const path = queryObj.path || '';
-    if (path.startsWith('messages/')) {
-        const chatId = path.replace('messages/', '').split('/')[0];
-        socket.emit('join_room', chatId);
-        const listener = (data) => {
-            callback(new MockSnapshot(data.id, data));
-        };
-        socket.on('message_added', listener);
-        return () => {
-            socket.off('message_added', listener);
-            socket.emit('leave_room', chatId);
-        };
-    }
-    return () => {};
-};
-
-export const onChildChanged = (queryObj, callback) => () => {};
-export const onChildRemoved = (queryObj, callback) => () => {};
-
-export const onValue = (refObj, callback) => {
-    // Initial fetch
-    get(refObj).then(snap => callback(snap)).catch(() => {});
-    
-    // Register socket listener for real-time updates
-    const listener = (data) => {
-        if (data && data.path && (data.path === refObj.path || data.path.startsWith(refObj.path + '/'))) {
-            get(refObj).then(snap => callback(snap)).catch(() => {});
-        }
-    };
-    socket.on('db_ref_updated', listener);
-
-    return () => {
-        socket.off('db_ref_updated', listener);
-    };
-};
-
-export const onDisconnect = (refObj) => ({
-    set: async (value) => {},
-    cancel: async () => {}
-});
-
-export const registerSocketUser = (userId) => {
-    if (socket) {
-        socket.emit('register_user', userId);
-        console.log("Registered user on Socket.io:", userId);
-    }
-};
-
-export const runTransaction = async (refObj, updateFn) => {
-    try {
-        const snap = await get(refObj);
-        const currentVal = snap.val();
-        const newVal = updateFn(currentVal);
-        await set(refObj, newVal);
-        return { committed: true, snapshot: new MockSnapshot(snap.key, newVal) };
-    } catch (e) {
-        console.error("Mock DB runTransaction error:", e);
-        return { committed: false };
-    }
-};
 import { ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
 import { db, storage, auth } from './firebase-config.js';
 import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages } from './cache-manager.js';
 
 
 /**
- * Uploads a file to VPS local storage and returns the download URL
+ * Uploads a file to Firebase Storage and returns the download URL
  */
 export const uploadFile = (path, file, onProgress) => {
-    const formData = new FormData();
-    formData.append('file', file);
+    const storageRef = sRef(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
 
-    const xhr = new XMLHttpRequest();
     const promise = new Promise((resolve, reject) => {
-        xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable && onProgress) {
-                const percent = (e.loaded / e.total) * 100;
-                onProgress(percent);
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                if (onProgress) onProgress(progress);
+            },
+            (error) => reject(error),
+            () => {
+                getDownloadURL(uploadTask.snapshot.ref).then(resolve);
             }
-        });
-        
-        xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const res = JSON.parse(xhr.responseText);
-                    resolve(res.url);
-                } catch (e) {
-                    reject(new Error("Failed to parse upload response"));
-                }
-            } else {
-                reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
-        });
-        
-        xhr.addEventListener('error', () => reject(new Error("Network upload error")));
-        xhr.addEventListener('abort', () => reject(new Error("Upload aborted")));
-        
-        xhr.open('POST', `${BACKEND_URL}/api/upload`);
-        xhr.send(formData);
+        );
     });
 
-    promise.cancel = () => xhr.abort();
+    promise.cancel = () => uploadTask.cancel();
     return promise;
 };
 
 /**
- * Deletes a file from VPS storage given its download URL
+ * Deletes a file from Firebase Storage given its download URL
  */
 export const deleteFile = async (url) => {
     if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
     try {
-        await fetch(`${BACKEND_URL}/api/delete-file`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
-        });
+        const storageRef = sRef(storage, url);
+        await deleteObject(storageRef);
     } catch (error) {
-        console.error("Error deleting file from VPS storage:", error);
+        console.error("Error deleting file from storage:", error);
     }
 };
 
@@ -1104,11 +928,15 @@ export const subscribeToSentRequests = (uid, callback) => {
  * Listens for changes in the user's active customer list
  */
 export const subscribeToCustomerList = (userId, callback) => {
+    console.log("[Customer List Debug] Subscribing to customerList for user:", userId);
     const customerRef = ref(db, `users/${userId}/customerList`);
     return onValue(customerRef, (snapshot) => {
         const val = snapshot.val() || {};
+        console.log("[Customer List Debug] customerList snapshot received. Data:", val);
         Object.keys(val).forEach(otherUid => requestUserProfile(otherUid));
         callback(val);
+    }, (error) => {
+        console.error("[Customer List Debug] Error in subscribeToCustomerList listener:", error);
     });
 };
 
@@ -1116,9 +944,11 @@ export const subscribeToCustomerList = (userId, callback) => {
  * Listens for changes to the entire users directory
  */
 export const subscribeToAllUsers = (callback) => {
+    console.log("[All Users Debug] Subscribing to publicProfiles...");
     const usersRef = ref(db, 'publicProfiles');
     return onValue(usersRef, (snapshot) => {
         const val = snapshot.val() || {};
+        console.log("[All Users Debug] publicProfiles snapshot received. Count:", Object.keys(val).length);
         const parsedUsers = {};
         Object.entries(val).forEach(([uid, profile]) => {
             parsedUsers[uid] = { uid, ...profile };
@@ -1126,7 +956,7 @@ export const subscribeToAllUsers = (callback) => {
         });
         callback(parsedUsers);
     }, (error) => {
-        console.error("Error in subscribeToAllUsers database listener:", error);
+        console.error("[All Users Debug] Error in subscribeToAllUsers database listener:", error);
     });
 };
 
@@ -1134,9 +964,11 @@ export const subscribeToAllUsers = (callback) => {
  * Listens for real-time changes to a specific user's profile
  */
 export const subscribeToUserProfile = (userId, callback) => {
+    console.log("[User Profile Debug] Subscribing to profile for user:", userId);
     const userRef = ref(db, `publicProfiles/${userId}`);
     return onValue(userRef, (snapshot) => {
         const val = snapshot.val();
+        console.log("[User Profile Debug] Profile snapshot received for user:", userId, "Data:", val);
         if (val) {
             const profile = { uid: userId, ...val };
             cacheItem('profiles', profile);
@@ -1144,6 +976,8 @@ export const subscribeToUserProfile = (userId, callback) => {
             notifyAllUsersCallbacks();
         }
         callback(val);
+    }, (error) => {
+        console.error("[User Profile Debug] Error in subscribeToUserProfile listener for:", userId, error);
     });
 };
 
@@ -1564,12 +1398,19 @@ export const toggleMuteUser = async (userId, targetUid, isMuted) => {
  * Call History Logs
  */
 export const saveCallLog = async (userId, logData) => {
-    const logsRef = ref(db, `callLogs/${userId}`);
-    const newLogRef = push(logsRef);
-    await set(newLogRef, {
-        ...logData,
-        timestamp: serverTimestamp()
-    });
+    console.log("[Call History Debug] saveCallLog called. userId:", userId, "logData:", logData);
+    try {
+        const logsRef = ref(db, `callLogs/${userId}`);
+        const newLogRef = push(logsRef);
+        await set(newLogRef, {
+            ...logData,
+            timestamp: serverTimestamp()
+        });
+        console.log("[Call History Debug] saveCallLog successfully written!");
+    } catch (e) {
+        console.error("[Call History Debug] saveCallLog write error:", e);
+        throw e;
+    }
 };
 
 export const clearCallHistory = async (userId) => {
@@ -1578,9 +1419,14 @@ export const clearCallHistory = async (userId) => {
 };
 
 export const subscribeToCallHistory = (userId, callback) => {
+    console.log("[Call History Debug] subscribeToCallHistory called for:", userId);
     const logsRef = ref(db, `callLogs/${userId}`);
     return onValue(logsRef, (snapshot) => {
-        callback(snapshot.val() || {});
+        const val = snapshot.val() || {};
+        console.log("[Call History Debug] Received callLogs snapshot. Items count:", Object.keys(val).length);
+        callback(val);
+    }, (error) => {
+        console.error("[Call History Debug] Error subscribing to call history:", error);
     });
 };
 

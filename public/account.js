@@ -13,7 +13,7 @@ import {
     deleteFullUserProfile,
     updateUserProfile,
     getUserProfile
-} from './database-service.js';
+} from './database-service.js?v=1.0.7';
 import { hideElement, showElement } from './utils.js';
 
 export const initAccount = () => {

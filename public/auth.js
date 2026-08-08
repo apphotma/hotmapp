@@ -1,9 +1,9 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
 import { loginWithCustomToken, logoutUser, subscribeToAuthChanges, setAuthPersistence, setupRecaptcha, sendSmsCode } from './auth-service.js?v=1.0.2';
-import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js';
+import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js?v=1.0.7';
 import { auth, db } from './firebase-config.js';
-import { ref, onValue, set, get } from './database-service.js';
+import { ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { registerFcmToken, removeFcmToken } from './fcm-service.js';
 import { hideElement, showElement, setElementText, getAvatarUrl, cropToSquare } from './utils.js';
 import { showLockScreen } from './app-lock.js';
@@ -353,9 +353,8 @@ export const initAuth = () => {
                     const dbSessionId = snapshot.val();
                     const localSessionId = localStorage.getItem('mainSessionId');
 
-                        console.log("[Session Debug] Mismatch check. dbSessionId:", dbSessionId, typeof dbSessionId, "localSessionId:", localSessionId, typeof localSessionId);
-                        if (dbSessionId) {
-                            if (localSessionId && dbSessionId !== localSessionId) {
+                    if (dbSessionId) {
+                        if (localSessionId && dbSessionId !== localSessionId) {
                             showToast("Logged out because you logged in on another device.", "warning");
                             
                             if (mainSessionUnsubscribe) {
@@ -375,10 +374,9 @@ export const initAuth = () => {
                                 console.error("Firebase logout failed:", logoutErr);
                             }
                             
-                            console.warn("[Session Debug] Reload blocked to prevent loop.");
-                            // setTimeout(() => {
-                            //     window.location.reload();
-                            // }, 1500);
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
                         } else if (!localSessionId) {
                             // No local session ID exists yet (new browser/login).
                             // Generate a new session ID to claim active login and force logout on other devices.
@@ -396,44 +394,7 @@ export const initAuth = () => {
             }
 
             try {
-                let profile = await getUserProfile(user.uid);
-                if (!profile) {
-                    console.log("[Migration] SQLite profile missing. Synching user profile, friends, and active chats from Firebase...");
-                    const fbBaseUrl = "https://hotma-app-default-rtdb.firebaseio.com";
-                    const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-                        ? 'http://localhost:3000' 
-                        : 'https://api.hotmapp.shop';
-                    
-                    try {
-                        const [pubProfileRes, customerListRes, chatListRes] = await Promise.all([
-                            fetch(`${fbBaseUrl}/publicProfiles/${user.uid}.json`),
-                            fetch(`${fbBaseUrl}/users/${user.uid}/customerList.json`),
-                            fetch(`${fbBaseUrl}/users/${user.uid}/chatList.json`)
-                        ]);
-                        
-                        const publicProfile = await pubProfileRes.json();
-                        const customerList = await customerListRes.json();
-                        const chatList = await chatListRes.json();
-                        
-                        if (publicProfile) {
-                            await fetch(`${backendUrl}/api/users/sync-profile`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    uid: user.uid,
-                                    publicProfile,
-                                    customerList,
-                                    chatList
-                                })
-                            });
-                            console.log("[Migration] Sync complete. Querying SQLite database again...");
-                            profile = await getUserProfile(user.uid);
-                        }
-                    } catch (syncErr) {
-                        console.error("[Migration] Failed to auto-sync profile from Firebase:", syncErr);
-                    }
-                }
-
+                const profile = await getUserProfile(user.uid);
                 if (profile) {
                     console.log("Authenticated as:", profile.fullname);
                     

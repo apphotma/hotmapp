@@ -4,8 +4,8 @@ import { currentLanguage, languageList } from './language.js';
 import { pushHistoryState, removeHistoryState, replaceHistoryState, dismissHistoryState } from './history-manager.js';
 import { auth, db } from './firebase-config.js';
 import { debounce, getRelativeTime, compressImage, getAvatarUrl, isEditableTextMessage } from './utils.js'; // Import utilities
-import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from './database-service.js';
-import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder, registerSocketUser } from './database-service.js?v=1.0.1';
+import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.0.7';
 import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages } from './cache-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { refreshStoreGrids } from './store.js';
@@ -2444,12 +2444,8 @@ const hideReplyPreview = () => {
 };
 
 const sendMedia = async (type, fileOrBlob, fileName = null) => {
-    console.log("[DEBUG] sendMedia entered. type:", type, "fileName:", fileName);
     const user = auth.currentUser;
-    if (!user || !activeChatUid || !fileOrBlob || !elements.chatArea) {
-        console.warn("[DEBUG] sendMedia early return. user:", !!user, "activeChatUid:", activeChatUid, "fileOrBlob:", !!fileOrBlob, "chatArea:", !!elements.chatArea);
-        return;
-    }
+    if (!user || !activeChatUid || !fileOrBlob || !elements.chatArea) return;
 
     if (fileOrBlob.size > MAX_FILE_SIZE) {
         showToast(`File too large! Max size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`, "error");
@@ -6739,18 +6735,7 @@ const startMessageListener = async (otherUid) => {
     msgChangeUnsubscribe = subscribeToMessageUpdates(chatId, async (msg) => {
         console.log(`[E2EE DEBUG] msgChangeUnsubscribe: message updated ${msg.id}. status: ${msg.status}`);
         await cacheItem('messages', msg);
-
-        const existing = messages.find(m => m.id === msg.id);
         const decryptedMsg = await decryptMessageInPlace({ ...msg });
-
-        if (existing && existing.senderId === auth.currentUser?.uid && existing.url && !decryptedMsg.url) {
-            decryptedMsg.url = existing.url;
-            decryptedMsg.thumbnailUrl = existing.thumbnailUrl;
-            decryptedMsg.fileName = existing.fileName;
-            decryptedMsg.fileSize = existing.fileSize;
-            decryptedMsg.duration = existing.duration;
-            decryptedMsg.isDecrypted = true;
-        }
 
         if (decryptedMsg.orderConfirmed && decryptedMsg.invoiceId) {
             try {
@@ -7640,15 +7625,15 @@ const updateRequestBadges = () => {
 
     if (elements.requestCountBadge) {
         elements.requestCountBadge.textContent = totalCount;
-        elements.requestCountBadge.style.display = 'inline-block';
+        elements.requestCountBadge.style.display = totalCount > 0 ? 'inline-block' : 'none';
     }
     if (elements.headerIncomingRequestBadge) {
         elements.headerIncomingRequestBadge.textContent = incomingCount;
-        elements.headerIncomingRequestBadge.style.display = 'inline-block';
+        elements.headerIncomingRequestBadge.style.display = incomingCount > 0 ? 'inline-block' : 'none';
     }
     if (elements.headerOutgoingRequestBadge) {
         elements.headerOutgoingRequestBadge.textContent = outgoingCount;
-        elements.headerOutgoingRequestBadge.style.display = 'inline-block';
+        elements.headerOutgoingRequestBadge.style.display = outgoingCount > 0 ? 'inline-block' : 'none';
     }
 };
 
@@ -8277,7 +8262,6 @@ export const initChatSelection = () => {
     // Initialize sidebars and unread counters when authenticated
     subscribeToAuthChanges(async (user) => {
         if (user) {
-            registerSocketUser(user.uid);
             await waitForE2EEKeys(user.uid);
             // Check for Web Share Target query parameters from external apps
             const urlParams = new URLSearchParams(window.location.search);
@@ -8404,6 +8388,7 @@ export const initChatSelection = () => {
             });
 
             subscribeToSentRequests(user.uid, (sent) => {
+                console.log("[Friend Requests Debug] subscribeToSentRequests fired. Data:", sent);
                 currentOutgoingRequests = sent;
                 updateRequestActionButtonState();
                 refreshChatSidebars();
@@ -8413,6 +8398,7 @@ export const initChatSelection = () => {
 
             let prevIncomingCount = null;
             subscribeToFriendRequests(user.uid, (requests) => {
+                console.log("[Friend Requests Debug] subscribeToFriendRequests fired. Data:", requests);
                 const newCount = Object.keys(requests || {}).filter(uid => requests[uid]).length;
                 if (prevIncomingCount !== null && newCount > prevIncomingCount) {
                     playIncomingSound();
@@ -9848,12 +9834,8 @@ export const initChatSelection = () => {
     elements.fileInput?.addEventListener('change', async (e) => {
         const files = e.target.files;
         const user = auth.currentUser;
-        console.log("[DEBUG] fileInput change event triggered. files:", files ? files.length : 0, "user:", !!user, "activeChatUid:", activeChatUid);
 
-        if (!files || files.length === 0 || !user || !activeChatUid) {
-            console.warn("[DEBUG] fileInput early exit. files:", !!files, "user:", !!user, "activeChatUid:", activeChatUid);
-            return;
-        }
+        if (!files || files.length === 0 || !user || !activeChatUid) return;
 
         const chatId = [user.uid, activeChatUid].sort().join('_');
 

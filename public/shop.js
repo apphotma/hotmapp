@@ -3,9 +3,9 @@ import { showToast } from './toast.js';
 import { getActiveChatUid } from './chat.js';
 import { debounce, calculateDistance, getHeuristicTravelTime, getTravelTimeFromAPI, getAvatarUrl, parsePrice } from './utils.js';
 import { auth, db } from './firebase-config.js'; // Import db
-import { ref, get } from './database-service.js';
+import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { openBusinessLocationPicker, openShopAccessRequestModal } from './store.js';
-import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.0.1';
+import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.0.7';
 import { getOrDeriveSharedKey, encryptText } from './crypto-helper.js';
 import { pushHistoryState, removeHistoryState, dismissHistoryState } from './history-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';

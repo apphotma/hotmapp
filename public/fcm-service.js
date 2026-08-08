@@ -1,6 +1,6 @@
 import { messagingPromise, VAPID_KEY, db } from './firebase-config.js';
 import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging.js";
-import { ref, set } from './database-service.js';
+import { ref, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { showToast } from './toast.js';
 
 

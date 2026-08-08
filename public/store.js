@@ -1,8 +1,8 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
-import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.0.1';
+import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.0.7';
 import { auth, db } from './firebase-config.js';
-import { ref, get } from './database-service.js';
+import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { subscribeToAuthChanges } from './auth-service.js';
 import { getAllCachedProducts, cacheItem, getCachedItem } from './cache-manager.js';
 import { getActiveChatUid, moduleFriendsList } from './chat.js';

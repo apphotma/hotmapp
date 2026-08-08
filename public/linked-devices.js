@@ -1,12 +1,12 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
 import { auth } from './firebase-config.js';
-import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js';
+import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js?v=1.0.7';
 import { db } from './firebase-config.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { getRelativeTime } from './utils.js';
 import { getStoredKey } from './crypto-helper.js';
-import { ref, get } from './database-service.js';
+import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 export const initLinkedDevices = () => {
     let qrScanner = null;
