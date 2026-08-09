@@ -2085,16 +2085,20 @@ iframe {
 .message-status {
     font-size: 0.85rem;
     line-height: 1;
-    color: #8696a0;
+    color: #8696a0; /* Muted Gray default */
     margin-left: 1px;
     display: inline-flex;
     align-items: center;
     transition: color 0.3s ease;
 }
 
+/* Sent icon (single checkmark) is dark green */
+.message-status i.fa-check {
+    color: #008069; /* Dark Green */
+}
+
 .message-status.read {
-    color: #34b7f1;
-    /* WhatsApp Blue */
+    color: #34b7f1; /* WhatsApp Blue when read */
 }
 
 .message-status.read i {

@@ -2074,7 +2074,8 @@ const handleStarRating = (e) => {
                     fileName: fileName,
                     fileSize: pdfBlob.size,
                     timestamp: Date.now(),
-                    previewText: `📄 Invoice ${orderNumber}`
+                    previewText: `📄 Invoice ${orderNumber}`,
+                    status: chatId.startsWith('group_') ? 'notified' : 'sent'
                 };
 
                 // Encrypt the invoice reference if E2EE is active

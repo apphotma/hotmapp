@@ -1223,7 +1223,7 @@ const updateFrequentEmojis = (emoji) => {
 const emojiKeywords = {
     '😀': 'grinning happy smile joy', '😃': 'grinning happy smile eye', '😄': 'grinning happy smile eye', '😁': 'grinning happy smile eye beam', '😆': 'grinning happy smile squint', '😅': 'grinning happy smile sweat cold', '😂': 'joy tears laughing happy', '🤣': 'rofl laughing floor', '😊': 'blush happy smile', '😇': 'halo innocent angel', '🙂': 'slight smile', '🙃': 'upside down smile', '😉': 'wink smile', '😌': 'relieved smile', '😍': 'heart eyes love', '🥰': 'hearts love smiling', '😘': 'kiss love blowing', '😗': 'kissing face', '😙': 'kissing eye smile', '😚': 'kissing closed eye', '😋': 'savoring delicious food', '😛': 'tongue face', '😝': 'squint tongue', '😜': 'wink tongue', '🤪': 'zany crazy face', '🧐': 'monocle smart', '😎': 'sunglasses cool', '🤩': 'star struck', '🥳': 'partying face', '😏': 'smirk', '😒': 'unamused', '😞': 'disappointed', '😔': 'pensive', '😟': 'worried', '😢': 'cry tear', '😭': 'sob cry loud', '😠': 'angry mad', '😡': 'pout angry red', '🤯': 'explode mind head', '👍': 'thumbs up ok agree', '👎': 'thumbs down no disagree', '❤️': 'heart love red', '🔥': 'fire lit hot', '✨': 'sparkles star', '✅': 'check mark verified', '❌': 'cross mark wrong'
 };
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB Limit
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB Limit
 const ALLOWED_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx'];
 
 const getDateString = (timestamp) => {
@@ -2632,7 +2632,8 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
             timestamp: clientTimestamp,
             thumbnailUrl: thumbnailUrl,
             replyTo: replyData,
-            fileSize: fileOrBlob.size // Add file size for document previews
+            fileSize: fileOrBlob.size, // Add file size for document previews
+            status: chatId.startsWith('group_') ? 'notified' : 'sent'
         };
         if (videoDuration) messageData.duration = videoDuration;
 
@@ -3612,7 +3613,8 @@ const initLocation = () => {
             address: address,
             mapUrl: mapUrl,
             staticMapUrl: staticMapUrl,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            status: chatId.startsWith('group_') ? 'notified' : 'sent'
         };
 
         let otherProfile = null;

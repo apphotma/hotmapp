@@ -7,7 +7,7 @@ const STATUS_PRIORITY = {
 };
 
 export const getMessageStatusIcon = (status) => {
-  if (status === 'pending') return 'fa-clock';
+  if (status === 'pending' || status === 'sending') return 'fa-clock';
   if (status === 'notified') return 'fa-paper-plane';
   if (status === 'sent') return 'fa-check';
   return 'fa-check-double';
