@@ -2819,7 +2819,10 @@
                             Step 1: Business Information</h3>
                         <div class="form-group" style="margin-bottom: 20px;">
                             <label>Company Name</label>
-                            <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Enter your company name, brand name, or shop name as you want customers to see it on the map.</div>
+                            <div class="field-hint"
+                                style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                Enter your company name, brand name, or shop name as you want customers to see it on the
+                                map.</div>
                             <input type="text" name="companyName" required data-ui="company-name"
                                 placeholder="Enter your business name">
                             <div class="error-msg" data-ui="company-name-error"></div>
@@ -2827,7 +2830,9 @@
                         <div class="form-row" style="margin-bottom: 20px;">
                             <div class="form-group">
                                 <label>Business base</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Select the country or region where your business is primarily located.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Select the country or region where your business is primarily located.</div>
                                 <div class="custom-select-wrapper" data-ui="country-picker-wrapper">
                                     <button type="button" class="auth-submit-btn" data-ui="country-trigger"
                                         style="background: var(--brand-dark); width: auto; padding: 8px 20px; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">Choose
@@ -2848,20 +2853,26 @@
                             </div>
                             <div class="form-group">
                                 <label>Service Type</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Select whether you support customer pickup, delivery, or both.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Select whether you support customer pickup, delivery, or both.</div>
                                 <select name="serviceType" required data-ui="service-type">
                                     <option value=""></option>
                                     <option value="both">Pickup and Delivery</option>
                                     <option value="pickup">Pickup Only</option>
                                     <option value="delivery">Delivery Only</option>
-  
+
                                 </select>
                                 <div class="error-msg" data-ui="service-type-error"></div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label for="initial-visibility-radius">General Market Visibility Limit</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Restrict how far away (in kilometers) customers can find your store on the map.</div>
-                                <select id="initial-visibility-radius" name="visibilityRadius" data-ui="visibility-radius">
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Restrict how far away (in kilometers) customers can find your store on the map.
+                                </div>
+                                <select id="initial-visibility-radius" name="visibilityRadius"
+                                    data-ui="visibility-radius">
                                     <option value="0">Show to everyone (No limit)</option>
                                     <option value="1">1 km (Walking distance)</option>
                                     <option value="3">3 km (Neighborhood)</option>
@@ -2872,7 +2883,9 @@
                             </div>
                             <div class="form-group">
                                 <label>Business Category</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Select the main category that best represents the products you sell.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Select the main category that best represents the products you sell.</div>
                                 <select name="businessCategory" required data-ui="business-category">
                                     <option value="">Select Category</option>
                                     <option value="Agriculture and Farming">🌾 Agriculture and Farming</option>
@@ -2898,7 +2911,9 @@
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Business Logo (Optional)</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Upload a square photo or brand logo for your business storefront.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Upload a square photo or brand logo for your business storefront.</div>
                                 <div style="display: flex; align-items: center; gap: 15px; margin-top: 5px;">
                                     <div
                                         style="width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--panel-soft); flex-shrink: 0;">
@@ -2923,34 +2938,42 @@
                         <!-- Pickup Section -->
                         <div data-ui="pickup-locations-section" style="display: none; margin-bottom: 30px;">
                             <h4 style="margin-bottom: 10px;">Pickup Locations <span class="required-mark">*</span></h4>
-                            <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Add one or more physical pickup locations for your customers.</div>
+                            <div class="field-hint"
+                                style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                Add one or more physical pickup locations for your customers.</div>
                             <div data-ui="pickup-locations-list" style="margin-bottom: 15px;"></div>
                             <button type="button" class="auth-submit-btn" data-ui="add-pickup-location-btn"
                                 style="background: var(--brand); width: auto; padding: 10px 20px;">+ Add Pickup
                                 Location</button>
                             <div class="error-msg" data-ui="pickup-location-error"></div>
                         </div>
-  
+
                         <!-- Delivery Section -->
                         <div data-ui="delivery-coverage-section" style="display: none; margin-bottom: 30px;">
                             <h4 style="margin-bottom: 10px;">Delivery Coverage</h4>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Standard Delivery Fee</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Enter the baseline amount charged for delivering orders to customers.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Enter the baseline amount charged for delivering orders to customers.</div>
                                 <input type="number" name="deliveryFee" step="0.01" min="0" data-ui="delivery-fee"
                                     placeholder="0.00">
                                 <div class="error-msg" data-ui="delivery-fee-error"></div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Min Order for Free Delivery</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Minimum order total to get free delivery. Leave blank for no free delivery.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Minimum order total to get free delivery. Leave blank for no free delivery.</div>
                                 <input type="number" name="minFreeDelivery" step="0.01" min="0"
                                     data-ui="min-free-delivery" placeholder="Leave empty for no limit">
                                 <div class="error-msg" data-ui="min-free-delivery-error"></div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Where do you deliver?</label>
-                                <div class="field-hint" style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">Select if your delivery coverage is limited by Countries, States, or Cities.</div>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Select if your delivery coverage is limited by Countries, States, or Cities.</div>
                                 <div class="delivery-type-button-group" data-ui="delivery-type-button-group"
                                     style="display: flex; gap: 10px; margin-top: 5px;">
                                     <button type="button" class="type-btn" data-value="country"
@@ -4450,7 +4473,7 @@
         <audio id="remote-audio" autoplay></audio>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="capacitor.js"></script>
-        <script type="module" src="main.js?v=1.1.8"></script>
+        <script type="module" src="main.js?v=1.1.11"></script>
         <!-- Bootstrap JS Bundle with Popper -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"

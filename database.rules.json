@@ -42,7 +42,9 @@
     },
     "publicProfiles": {
       ".read": "true",
-      ".indexOn": ["phoneNumber"],
+      ".indexOn": [
+        "phoneNumber"
+      ],
       "$userId": {
         ".write": "auth != null && auth.uid === $userId"
       }

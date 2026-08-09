@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js?v=1.1.8';
+import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js?v=1.1.11';
 import { showToast } from './toast.js';
 import { hideElement, showElement, getAvatarUrl, compressImage, cropToSquare } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
@@ -659,6 +659,26 @@ export const initProfile = () => {
         if (link) {
             navigator.clipboard.writeText(link).then(() => {
                 showToast("Invite link copied to clipboard!", "success");
+
+                const btn = elements.copyInviteLinkBtn;
+                if (btn) {
+                    const originalHtml = btn.innerHTML;
+                    const originalBg = btn.style.background;
+
+                    btn.innerHTML = `<i class="fa-solid fa-check" style="animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;"></i> Copied!`;
+                    btn.style.background = '#2ecc71';
+                    btn.style.transform = 'scale(1.05)';
+                    btn.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.4)';
+                    btn.style.pointerEvents = 'none';
+
+                    setTimeout(() => {
+                        btn.innerHTML = originalHtml;
+                        btn.style.background = originalBg;
+                        btn.style.transform = '';
+                        btn.style.boxShadow = '';
+                        btn.style.pointerEvents = 'auto';
+                    }, 2000);
+                }
             }).catch(err => {
                 console.error("Failed to copy link:", err);
                 showToast("Failed to copy link", "error");

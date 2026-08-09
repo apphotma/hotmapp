@@ -5,7 +5,7 @@ import { pushHistoryState, removeHistoryState, replaceHistoryState, dismissHisto
 import { auth, db } from './firebase-config.js';
 import { debounce, getRelativeTime, compressImage, getAvatarUrl, isEditableTextMessage } from './utils.js'; // Import utilities
 import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
-import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.1.8';
+import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.1.10';
 import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages } from './cache-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { refreshStoreGrids } from './store.js';
@@ -231,7 +231,10 @@ const tryDecryptMessage = async (msg, senderId) => {
                 return "🔒 [Encrypted Message]";
             }
 
-            const otherProfile = allUsersCache[otherUid] || await getUserProfile(otherUid);
+            let otherProfile = allUsersCache[otherUid];
+            if (!otherProfile || !otherProfile.publicKey) {
+                otherProfile = await getUserProfile(otherUid);
+            }
             if (!otherProfile || !otherProfile.publicKey) {
                 console.warn(`[E2EE DEBUG] tryDecryptMessage: publicProfile or publicKey missing for otherUid: ${otherUid}`, otherProfile);
                 return "🔒 [Encrypted Message]";
@@ -272,9 +275,13 @@ const decryptMessageInPlace = async (msg, options = {}) => {
         msg.isDecrypted = false;
     }
 
-    if (msg.isEncrypted && msg.text && msg.iv && !msg.isDecrypted) {
-        msg.ciphertext = msg.text;
-        const decrypted = await tryDecryptMessage(msg, msg.senderId);
+    const ciphertext = msg.ciphertext || msg.text;
+
+    if (msg.isEncrypted && ciphertext && msg.iv && !msg.isDecrypted) {
+        msg.ciphertext = ciphertext;
+        // Pass a copy with the original text to tryDecryptMessage
+        const tempMsg = { ...msg, text: ciphertext };
+        const decrypted = await tryDecryptMessage(tempMsg, msg.senderId);
 
         const isDecryptedSuccessfully = decrypted && !decrypted.startsWith("🔒");
 
@@ -328,10 +335,32 @@ const decryptMessageInPlace = async (msg, options = {}) => {
     return msg;
 };
 
+const decryptPendingMessages = async () => {
+    console.log(`[E2EE DEBUG] decryptPendingMessages starting. Messages count: ${messages.length}`);
+    let decryptedAny = false;
+    for (const msg of messages) {
+        if (msg.isEncrypted && !msg.isDecrypted) {
+            console.log(`[E2EE DEBUG] decryptPendingMessages: attempting decryption for message ${msg.id}`);
+            const decryptedMsg = await decryptMessageInPlace(msg);
+            if (decryptedMsg.isDecrypted) {
+                console.log(`[E2EE DEBUG] decryptPendingMessages: successfully decrypted message ${msg.id} in real-time.`);
+                decryptedAny = true;
+                displayMessage(decryptedMsg);
+            }
+        }
+    }
+    if (decryptedAny) {
+        console.log("[E2EE DEBUG] decryptPendingMessages: completed and updated UI.");
+    }
+};
+
 const tryDecryptPreview = async (otherUid, ciphertext, iv) => {
     const currentUser = auth.currentUser;
     if (!currentUser || !otherUid || !ciphertext || !iv) return "🔒 [Encrypted Message]";
-    const otherProfile = allUsersCache[otherUid] || await getUserProfile(otherUid);
+    let otherProfile = allUsersCache[otherUid];
+    if (!otherProfile || !otherProfile.publicKey) {
+        otherProfile = await getUserProfile(otherUid);
+    }
     if (!otherProfile || !otherProfile.publicKey) return "🔒 [Encrypted Message]";
     const sharedKey = await getOrDeriveSharedKey(currentUser.uid, otherProfile.publicKey);
     if (!sharedKey) return "🔒 [Encrypted Message]";
@@ -1944,7 +1973,10 @@ const executeForward = async (targetUid, messagesToForward) => {
 
     let targetProfile = null;
     if (!targetUid.startsWith('group_')) {
-        targetProfile = allUsersCache[targetUid] || await getUserProfile(targetUid);
+        targetProfile = allUsersCache[targetUid];
+        if (!targetProfile || !targetProfile.publicKey) {
+            targetProfile = await getUserProfile(targetUid);
+        }
     }
     const isTargetE2EE = targetProfile && targetProfile.publicKey;
     let sharedKey = null;
@@ -2606,7 +2638,10 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
 
         let otherProfile = null;
         if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid] || await getUserProfile(activeChatUid);
+            otherProfile = allUsersCache[activeChatUid];
+            if (!otherProfile || !otherProfile.publicKey) {
+                otherProfile = await getUserProfile(activeChatUid);
+            }
         }
         if (otherProfile && otherProfile.publicKey) {
             const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
@@ -3100,7 +3135,10 @@ const initLocation = () => {
 
                 let otherProfile = null;
                 if (!activeChatUid.startsWith('group_')) {
-                    otherProfile = allUsersCache[activeChatUid] || await getUserProfile(activeChatUid);
+                    otherProfile = allUsersCache[activeChatUid];
+                    if (!otherProfile || !otherProfile.publicKey) {
+                        otherProfile = await getUserProfile(activeChatUid);
+                    }
                 }
                 if (otherProfile && otherProfile.publicKey) {
                     const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
@@ -3166,7 +3204,10 @@ const initLocation = () => {
 
         let otherProfile = null;
         if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid] || await getUserProfile(activeChatUid);
+            otherProfile = allUsersCache[activeChatUid];
+            if (!otherProfile || !otherProfile.publicKey) {
+                otherProfile = await getUserProfile(activeChatUid);
+            }
         }
         if (otherProfile && otherProfile.publicKey) {
             const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
@@ -3576,7 +3617,10 @@ const initLocation = () => {
 
         let otherProfile = null;
         if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid] || await getUserProfile(activeChatUid);
+            otherProfile = allUsersCache[activeChatUid];
+            if (!otherProfile || !otherProfile.publicKey) {
+                otherProfile = await getUserProfile(activeChatUid);
+            }
         }
         if (otherProfile && otherProfile.publicKey) {
             const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
@@ -5656,7 +5700,9 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 oldType !== msg.type ||
                 oldDeleted !== msg.deleted ||
                 oldEncrypted !== msg.isEncrypted ||
-                oldPreviewText !== msg.previewText
+                oldPreviewText !== msg.previewText ||
+                previousMessage.isDecrypted !== msg.isDecrypted ||
+                previousMessage.text !== msg.text
             );
         }
     } else {
@@ -6491,6 +6537,10 @@ const startMessageListener = async (otherUid) => {
                     // Render E2EE notice bubble at the top of the chat
                     renderE2EENotice(!!(profile.publicKey));
 
+                    if (profile.publicKey) {
+                        decryptPendingMessages();
+                    }
+
                     if (elements.chatHeaderAvatar) {
                         const initials = (profile.fullname || 'U').charAt(0).toUpperCase();
                         const dot = elements.chatHeaderAvatar.querySelector('.online-dot');
@@ -6614,6 +6664,8 @@ const startMessageListener = async (otherUid) => {
         }
         await waitForBrowserIdle();
     }
+
+    decryptPendingMessages();
 
     if (olderMessagesBacklog.length > 0) {
         attachChatInteractionPauseListeners();
@@ -7064,7 +7116,10 @@ const sendMessage = async () => {
 
     let otherProfile = null;
     if (!activeChatUid.startsWith('group_')) {
-        otherProfile = allUsersCache[activeChatUid] || await getUserProfile(activeChatUid);
+        otherProfile = allUsersCache[activeChatUid];
+        if (!otherProfile || !otherProfile.publicKey) {
+            otherProfile = await getUserProfile(activeChatUid);
+        }
         if (otherProfile && otherProfile.blockedUsers && otherProfile.blockedUsers[user.uid]) {
             showToast("You cannot send messages to this contact because they have blocked you.", "error");
             return;
@@ -7836,7 +7891,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
             const profile = allUsers[uid];
             if (profile) {
                 if (elements.manageCustomersModal) elements.manageCustomersModal.style.display = 'none';
-                
+
                 let showReq = false;
                 let mode = null;
                 if (activeManageTab === 'requests') {
@@ -7848,7 +7903,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
                 } else if (activeManageTab === 'new') {
                     mode = 'send-request';
                 }
-                
+
                 showUserProfileInfo(uid, profile, showReq, mode);
             }
             return;
@@ -8166,6 +8221,7 @@ export const initChatSelection = () => {
             const groupSnap = await get(ref(db, `groups/${groupId}`));
             if (!groupSnap.exists()) {
                 showToast("This group invite link is invalid or the group has been deleted.", "error");
+                localStorage.removeItem('pending_group_invite');
                 return;
             }
             const groupData = groupSnap.val();
@@ -8173,6 +8229,7 @@ export const initChatSelection = () => {
             // 2. Check if the user is already in the group
             if (groupData.members && groupData.members[currentUser.uid]) {
                 showToast("You are already a member of this group.", "info");
+                localStorage.removeItem('pending_group_invite');
                 const groupChatItem = document.querySelector(`.conversation-item[data-uid="${groupId}"]`);
                 if (groupChatItem) {
                     groupChatItem.click();
@@ -8236,6 +8293,7 @@ export const initChatSelection = () => {
 
             const handleCancelJoin = () => {
                 if (elements.joinGroupOverlay) elements.joinGroupOverlay.style.display = 'none';
+                localStorage.removeItem('pending_group_invite');
             };
             elements.joinGroupCancelBtn.replaceWith(elements.joinGroupCancelBtn.cloneNode(true));
             const newCancelBtn = document.getElementById('join-group-cancel-btn');
@@ -8246,7 +8304,10 @@ export const initChatSelection = () => {
             newCloseBtn.addEventListener('click', handleCancelJoin);
 
             // 5. Show join modal
-            if (elements.joinGroupOverlay) elements.joinGroupOverlay.style.display = 'flex';
+            if (elements.joinGroupOverlay) {
+                elements.joinGroupOverlay.style.display = 'flex';
+            }
+            localStorage.removeItem('pending_group_invite');
 
         } catch (err) {
             console.error("Error loading group invite details:", err);
@@ -8286,8 +8347,8 @@ export const initChatSelection = () => {
                 }, 1200);
             }
 
-            // Check for Group Invite Link query parameter
-            const inviteGroupId = urlParams.get('invite');
+            // Check for Group Invite Link query parameter or pending localStorage invite
+            const inviteGroupId = localStorage.getItem('pending_group_invite') || urlParams.get('invite');
             if (inviteGroupId) {
                 // Clean URL query parameters immediately to avoid triggering modal repeatedly on refreshes
                 const newUrl = window.location.pathname;
@@ -9456,6 +9517,25 @@ export const initChatSelection = () => {
         try {
             await navigator.clipboard.writeText(currentTranslationText);
             showToast("Translation copied to clipboard", "success");
+
+            const btn = elements.copyTranslationBtn;
+            if (btn) {
+                const originalHtml = btn.innerHTML;
+                const originalBg = btn.style.background;
+                btn.innerHTML = `<i class="fa-solid fa-check" style="animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;"></i> Copied!`;
+                btn.style.background = '#2ecc71';
+                btn.style.transform = 'scale(1.03)';
+                btn.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.4)';
+                btn.style.pointerEvents = 'none';
+
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.style.background = originalBg;
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.pointerEvents = 'auto';
+                }, 2000);
+            }
         } catch (err) {
             showToast("Failed to copy translation", "error");
         }
@@ -10839,6 +10919,25 @@ export const initChatSelection = () => {
         try {
             await navigator.clipboard.writeText(user.uid);
             showToast("User ID copied to clipboard!", "success");
+
+            const btn = elements.copyMyUidBtn;
+            if (btn) {
+                const originalHtml = btn.innerHTML;
+                const originalBg = btn.style.background;
+                btn.innerHTML = `<i class="fa-solid fa-check" style="animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;"></i> Copied!`;
+                btn.style.background = '#2ecc71';
+                btn.style.transform = 'scale(1.03)';
+                btn.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.4)';
+                btn.style.pointerEvents = 'none';
+
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.style.background = originalBg;
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.pointerEvents = 'auto';
+                }, 2000);
+            }
         } catch (err) {
             showToast("Failed to copy User ID", "error");
         }
@@ -11320,25 +11419,48 @@ export const initChatSelection = () => {
         }
         const inviteLink = `${baseDomain}${window.location.pathname}?invite=${activeGroupInfoId}`;
 
+        const btn = elements.groupInfoInviteBtn;
+        let originalHtml = "";
+        let originalBg = "";
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            originalBg = btn.style.background;
+        }
+
         try {
-            if (navigator.share) {
+            await navigator.clipboard.writeText(inviteLink);
+            showToast("Group invite link copied to clipboard!", "success");
+
+            if (btn) {
+                btn.innerHTML = `<i class="fa-solid fa-check" style="animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;"></i> Link Copied!`;
+                btn.style.background = '#2ecc71';
+                btn.style.transform = 'scale(1.03)';
+                btn.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.4)';
+                btn.style.pointerEvents = 'none';
+
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.style.background = originalBg;
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.pointerEvents = 'auto';
+                }, 2000);
+            }
+        } catch (clipErr) {
+            console.error("Failed to copy invite link:", clipErr);
+            showToast("Failed to copy invite link.", "error");
+        }
+
+        if (navigator.share) {
+            try {
                 await navigator.share({
                     title: `Join our group on Hotmapp`,
                     text: `Use this link to join my group chat on Hotmapp:`,
                     url: inviteLink
                 });
-            } else {
-                await navigator.clipboard.writeText(inviteLink);
-                showToast("Group invite link copied to clipboard!", "success");
-            }
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                try {
-                    await navigator.clipboard.writeText(inviteLink);
-                    showToast("Group invite link copied to clipboard!", "success");
-                } catch (clipErr) {
-                    console.error("Failed to copy invite link:", clipErr);
-                    showToast("Failed to copy invite link.", "error");
+            } catch (shareErr) {
+                if (shareErr.name !== 'AbortError') {
+                    console.error("Native share failed:", shareErr);
                 }
             }
         }

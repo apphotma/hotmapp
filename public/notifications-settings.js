@@ -1,10 +1,10 @@
 import { elements } from './elements.js';
 import { auth, db } from './firebase-config.js';
-import { getUserProfile, updateUserProfile } from './database-service.js?v=1.1.8';
+import { getUserProfile, updateUserProfile } from './database-service.js?v=1.1.11';
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
-import { uploadFile } from './database-service.js?v=1.1.8';
+import { uploadFile } from './database-service.js?v=1.1.11';
 import { registerFcmToken, removeFcmToken, initFcmListener } from './fcm-service.js';
 
 // Track if the user has interacted with the page (required for Vibration API)
@@ -261,7 +261,29 @@ export const initNotificationSettings = () => {
         const token = localStorage.getItem('hotmapp_fcm_token');
         if (token) {
             navigator.clipboard.writeText(token)
-                .then(() => showToast("Push token copied to clipboard!", "success"))
+                .then(() => {
+                    showToast("Push token copied to clipboard!", "success");
+
+                    const btn = elements.copyFcmTokenBtn;
+                    if (btn) {
+                        const originalHtml = btn.innerHTML;
+                        const originalBg = btn.style.background;
+
+                        btn.innerHTML = `<i class="fa-solid fa-check" style="animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;"></i> Copied!`;
+                        btn.style.background = '#2ecc71';
+                        btn.style.transform = 'scale(1.03)';
+                        btn.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.4)';
+                        btn.style.pointerEvents = 'none';
+
+                        setTimeout(() => {
+                            btn.innerHTML = originalHtml;
+                            btn.style.background = originalBg;
+                            btn.style.transform = '';
+                            btn.style.boxShadow = '';
+                            btn.style.pointerEvents = 'auto';
+                        }, 2000);
+                    }
+                })
                 .catch(err => {
                     console.error("Copy failed:", err);
                     showToast("Failed to copy token.", "error");

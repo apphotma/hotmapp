@@ -1,8 +1,12 @@
 const DB_NAME = 'hotmapp_crypto_keys';
 const STORE_NAME = 'keys';
 
+let dbInstance = null;
+const userKeysCache = new Map();
+
 // Opens or upgrades IndexedDB database
 function openDB() {
+    if (dbInstance) return Promise.resolve(dbInstance);
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, 1);
         request.onupgradeneeded = (e) => {
@@ -11,13 +15,19 @@ function openDB() {
                 db.createObjectStore(STORE_NAME);
             }
         };
-        request.onsuccess = (e) => resolve(e.target.result);
+        request.onsuccess = (e) => {
+            dbInstance = e.target.result;
+            resolve(dbInstance);
+        };
         request.onerror = (e) => reject(e.target.error);
     });
 }
 
 // Retrieves a key from IndexedDB
 export async function getStoredKey(key) {
+    if (userKeysCache.has(key)) {
+        return userKeysCache.get(key);
+    }
     const db = await openDB();
     const value = await new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readonly');
@@ -27,11 +37,15 @@ export async function getStoredKey(key) {
         request.onerror = () => reject(request.error);
     });
 
+    if (value) {
+        userKeysCache.set(key, value);
+    }
     return value;
 }
 
 // Saves a key/value pair to IndexedDB
 export async function setStoredKey(key, value) {
+    userKeysCache.set(key, value);
     const db = await openDB();
     await new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');

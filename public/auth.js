@@ -1,7 +1,7 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
-import { loginWithCustomToken, logoutUser, subscribeToAuthChanges, setAuthPersistence, setupRecaptcha, sendSmsCode } from './auth-service.js?v=1.1.8';
-import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js?v=1.1.8';
+import { loginWithCustomToken, logoutUser, subscribeToAuthChanges, setAuthPersistence, setupRecaptcha, sendSmsCode } from './auth-service.js?v=1.1.10';
+import { saveUserProfile, getUserProfile, getUserIdByPhoneNumber, updateUserProfile, monitorPresence, createLinkingSession, listenForSessionAuth, monitorDeviceSession, validateAndCleanupSessions, updateLinkedDeviceLastSeen, processInvitation, uploadFile } from './database-service.js?v=1.1.10';
 import { auth, db } from './firebase-config.js';
 import { ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { registerFcmToken, removeFcmToken } from './fcm-service.js';
@@ -35,6 +35,13 @@ export const initAuth = () => {
     const chatIdFromUrl = urlParams.get('chatId');
     if (chatIdFromUrl) {
         localStorage.setItem('pending_chat_id', chatIdFromUrl);
+        const cleanUrl = window.location.pathname + window.location.hash.split('?')[0];
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+
+    const groupInviteFromUrl = urlParams.get('invite');
+    if (groupInviteFromUrl) {
+        localStorage.setItem('pending_group_invite', groupInviteFromUrl);
         const cleanUrl = window.location.pathname + window.location.hash.split('?')[0];
         window.history.replaceState({}, document.title, cleanUrl);
     }
@@ -75,7 +82,7 @@ export const initAuth = () => {
 
         // Clear immediately to prevent repeat triggers
         localStorage.removeItem('pending_invite_token');
-        
+
         const isNewReg = localStorage.getItem('is_new_registration') === 'true';
         localStorage.removeItem('is_new_registration');
 
@@ -140,7 +147,7 @@ export const initAuth = () => {
     const validateField = (input) => {
         const uiKey = input.dataset.ui;
         if (!uiKey) return true;
-        
+
         const errorEl = document.querySelector(`[data-ui="${uiKey}-error"]`);
         if (!errorEl) return true;
 
@@ -196,7 +203,7 @@ export const initAuth = () => {
 
             try {
                 const { sessionId, customToken } = await createLinkingSession(); // Get both session ID and custom token
-                
+
                 new QRCode(elements.linkQrContainer, {
                     text: `hotmapp_link:${sessionId}:${customToken}`, // Include custom token in QR code
                     width: 220,
@@ -206,7 +213,7 @@ export const initAuth = () => {
                     correctLevel: QRCode.CorrectLevel.L
                 });
 
-                 sessionUnsubscribe = listenForSessionAuth(sessionId, async (uid, encryptedSession, deviceKey) => {
+                sessionUnsubscribe = listenForSessionAuth(sessionId, async (uid, encryptedSession, deviceKey) => {
                     try {
                         showToast("Session authorized by other device! Syncing...", "info");
                         if (encryptedSession) {
@@ -224,7 +231,7 @@ export const initAuth = () => {
                                 };
                                 const ciphertext = base64ToBuffer(encryptedSession.ciphertext);
                                 const iv = base64ToBuffer(encryptedSession.iv);
-                                
+
                                 const encoder = new TextEncoder();
                                 const passcodeBytes = encoder.encode(customToken);
                                 const hash = await crypto.subtle.digest("SHA-256", passcodeBytes);
@@ -235,13 +242,13 @@ export const initAuth = () => {
                                     false,
                                     ["decrypt"]
                                 );
-                                
+
                                 const decryptedBuffer = await crypto.subtle.decrypt(
                                     { name: "AES-GCM", iv },
                                     aesKey,
                                     ciphertext
                                 );
-                                
+
                                 const decoder = new TextDecoder();
                                 const decryptedStr = decoder.decode(decryptedBuffer);
                                 const sessionData = JSON.parse(decryptedStr);
@@ -253,7 +260,7 @@ export const initAuth = () => {
                                     localStorage.setItem(sessionData.authKey, sessionData.authVal);
                                     localStorage.setItem('isLinkedDevice', 'true');
                                     localStorage.setItem('linkedDeviceSessionId', deviceKey || sessionId);
-                                    
+
                                     // Also save the Firebase Auth state to IndexedDB (firebaseLocalStorage)
                                     try {
                                         const fdb = await new Promise((resolve, reject) => {
@@ -293,9 +300,9 @@ export const initAuth = () => {
                                     if (elements.linkQrLoading) {
                                         elements.linkQrLoading.style.display = 'flex'; // Use flex to center spinner
                                     }
-                                    
+
                                     if (sessionUnsubscribe) sessionUnsubscribe();
-                                    
+
                                     setTimeout(() => {
                                         window.location.reload();
                                     }, 1000);
@@ -356,7 +363,7 @@ export const initAuth = () => {
                     if (dbSessionId) {
                         if (localSessionId && dbSessionId !== localSessionId) {
                             showToast("Logged out because you logged in on another device.", "warning");
-                            
+
                             if (mainSessionUnsubscribe) {
                                 mainSessionUnsubscribe();
                                 mainSessionUnsubscribe = null;
@@ -366,14 +373,14 @@ export const initAuth = () => {
                             localStorage.removeItem('hotmapp_saved_data');
                             localStorage.removeItem('hotmapp_app_lock_pin');
                             localStorage.removeItem('hotmapp_app_lock_duration');
-                            
+
                             try {
                                 await removeFcmToken(user.uid);
                                 await logoutUser();
                             } catch (logoutErr) {
                                 console.error("Firebase logout failed:", logoutErr);
                             }
-                            
+
                             setTimeout(() => {
                                 window.location.reload();
                             }, 1500);
@@ -397,7 +404,7 @@ export const initAuth = () => {
                 const profile = await getUserProfile(user.uid);
                 if (profile) {
                     console.log("Authenticated as:", profile.fullname);
-                    
+
                     // Initialize E2EE Keys
                     try {
                         if (isLinked) {
@@ -412,14 +419,14 @@ export const initAuth = () => {
                                     localStorage.removeItem('hotmapp_saved_data');
                                     localStorage.removeItem('hotmapp_app_lock_pin');
                                     localStorage.removeItem('hotmapp_app_lock_duration');
-                                    
+
                                     try {
                                         await removeFcmToken(user.uid);
                                         await logoutUser();
                                     } catch (logoutErr) {
                                         console.error("Firebase logout on revocation failed:", logoutErr);
                                     }
-                                    
+
                                     setTimeout(() => {
                                         window.location.reload();
                                     }, 1500);
@@ -450,37 +457,37 @@ export const initAuth = () => {
                             } else {
                                 // If they exist in DB, but not in local storage (e.g. logging into new browser),
                                 // we restore them automatically.
-                                 const stored = await getStoredKey(user.uid);
-                                 const privateProfileSnapshot = await get(ref(db, `users/${user.uid}/encryptedKeyPair`));
-                                 const dbEncryptedKeyPair = privateProfileSnapshot.val();
+                                const stored = await getStoredKey(user.uid);
+                                const privateProfileSnapshot = await get(ref(db, `users/${user.uid}/encryptedKeyPair`));
+                                const dbEncryptedKeyPair = privateProfileSnapshot.val();
 
-                                 if (!stored || !stored.publicKey || !stored.privateKey) {
-                                     console.warn("E2EE keys exist in database but are missing locally. Syncing keys...");
-                                     if (dbEncryptedKeyPair) {
-                                         try {
-                                             const keyPair = await decryptKeyPair(dbEncryptedKeyPair, user.uid);
-                                             await setStoredKey(user.uid, keyPair);
-                                             console.log("E2EE keys successfully restored from database!");
-                                         } catch (decErr) {
-                                             console.error("Failed to restore E2EE keys on startup:", decErr);
-                                         }
-                                     }
-                                 } else if (!dbEncryptedKeyPair) {
-                                     console.log("Backing up existing local E2EE keys to database...");
-                                     try {
-                                         const encrypted = await encryptKeyPair(stored, user.uid);
-                                         await updateUserProfile(user.uid, { encryptedKeyPair: encrypted });
-                                         console.log("E2EE keys successfully backed up to database!");
-                                     } catch (encErr) {
-                                         console.error("Failed to back up E2EE keys to database:", encErr);
-                                     }
-                                 }
+                                if (!stored || !stored.publicKey || !stored.privateKey) {
+                                    console.warn("E2EE keys exist in database but are missing locally. Syncing keys...");
+                                    if (dbEncryptedKeyPair) {
+                                        try {
+                                            const keyPair = await decryptKeyPair(dbEncryptedKeyPair, user.uid);
+                                            await setStoredKey(user.uid, keyPair);
+                                            console.log("E2EE keys successfully restored from database!");
+                                        } catch (decErr) {
+                                            console.error("Failed to restore E2EE keys on startup:", decErr);
+                                        }
+                                    }
+                                } else if (!dbEncryptedKeyPair) {
+                                    console.log("Backing up existing local E2EE keys to database...");
+                                    try {
+                                        const encrypted = await encryptKeyPair(stored, user.uid);
+                                        await updateUserProfile(user.uid, { encryptedKeyPair: encrypted });
+                                        console.log("E2EE keys successfully backed up to database!");
+                                    } catch (encErr) {
+                                        console.error("Failed to back up E2EE keys to database:", encErr);
+                                    }
+                                }
                             }
                         }
                     } catch (e) {
                         console.error("Failed to initialize E2EE keys:", e);
                     }
-                    
+
                     // Update Global Header
                     if (elements.headerUserName) elements.headerUserName.textContent = profile.fullname;
                     if (elements.headerUserAvatar) {
@@ -625,7 +632,7 @@ export const initAuth = () => {
 
     const toggleAuthMode = () => {
         isSignUp = !isSignUp;
-        
+
         confirmationResult = null;
         otpThrottleUntil = 0;
         stopOtpCooldown();
@@ -651,18 +658,18 @@ export const initAuth = () => {
         }
 
         setElementText(elements.authTitle, isSignUp ? 'Create Account' : 'Welcome back');
-        
-        setElementText(elements.authSubtitle, isSignUp 
-            ? 'Join Hotmapp to start shopping' 
+
+        setElementText(elements.authSubtitle, isSignUp
+            ? 'Join Hotmapp to start shopping'
             : 'Sign in to continue to Hotmapp');
-        
+
         setElementText(elements.authSubmitBtn, isSignUp ? 'Create Account' : 'Sign In');
-        
+
         const toggleText = document.querySelector('#auth-toggle-text');
-        setElementText(toggleText, isSignUp 
-            ? 'Already have an account?' 
+        setElementText(toggleText, isSignUp
+            ? 'Already have an account?'
             : "Don't have an account?");
-        
+
         setElementText(elements.authToggleBtn, isSignUp ? 'Sign In' : 'Sign Up');
 
         // Hide auth options (Remember Me) in Sign Up mode
@@ -711,7 +718,7 @@ export const initAuth = () => {
         confirmationResult = null;
         otpThrottleUntil = 0;
         stopOtpCooldown();
-        
+
         if (window.recaptchaVerifier) {
             try {
                 window.recaptchaVerifier.clear();
@@ -723,13 +730,13 @@ export const initAuth = () => {
 
         if (elements.authPhoneInput) elements.authPhoneInput.disabled = false;
         if (elements.authFullnameInput) elements.authFullnameInput.disabled = false;
-        
+
         hideElement(elements.otpGroup);
         if (elements.authOtpInput) {
             elements.authOtpInput.value = '';
             elements.authOtpInput.required = false;
         }
-        
+
         elements.authSubmitBtn.innerHTML = isSignUp ? 'Create Account' : 'Sign In';
     });
 
@@ -769,7 +776,7 @@ export const initAuth = () => {
 
     elements.authForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const btn = elements.authSubmitBtn;
         const originalContent = btn.innerHTML;
         const fullname = elements.authFullnameInput ? elements.authFullnameInput.value.trim() : '';
@@ -804,7 +811,7 @@ export const initAuth = () => {
 
         try {
             btn.disabled = true;
-            
+
             if (!confirmationResult) {
                 // Phase 1: Send SMS OTP
                 if (!phone.startsWith('+')) {
@@ -827,11 +834,11 @@ export const initAuth = () => {
 
                 setupRecaptcha('recaptcha-container');
                 confirmationResult = await sendSmsCode(phone);
-                
+
                 showToast("SMS verification code sent!", "info");
                 startOtpCooldown();
                 otpThrottleUntil = Date.now() + 60000;
-                
+
                 if (elements.authPhoneInput) elements.authPhoneInput.disabled = true;
                 if (elements.authFullnameInput) elements.authFullnameInput.disabled = true;
                 showElement(elements.otpGroup, 'block');
@@ -839,7 +846,7 @@ export const initAuth = () => {
                     elements.authOtpInput.required = true;
                     elements.authOtpInput.focus();
                 }
-                
+
                 btn.disabled = false;
                 btn.innerHTML = 'Verify Code';
             } else {
@@ -862,11 +869,11 @@ export const initAuth = () => {
                 await setAuthPersistence(rememberMe);
 
                 let pubKeyJwk = null;
-                 let storedKeys = await getStoredKey(user.uid);
-                 const profile = await getUserProfile(user.uid);
-                 const privateProfileSnapshot = await get(ref(db, `users/${user.uid}/encryptedKeyPair`));
-                 const dbEncryptedKeyPair = privateProfileSnapshot.val();
-                
+                let storedKeys = await getStoredKey(user.uid);
+                const profile = await getUserProfile(user.uid);
+                const privateProfileSnapshot = await get(ref(db, `users/${user.uid}/encryptedKeyPair`));
+                const dbEncryptedKeyPair = privateProfileSnapshot.val();
+
                 if (storedKeys && storedKeys.publicKey) {
                     pubKeyJwk = storedKeys.publicKey;
                     if (!dbEncryptedKeyPair) {
@@ -888,7 +895,7 @@ export const initAuth = () => {
                             console.error("Failed to decrypt E2EE keys:", decErr);
                         }
                     }
-                    
+
                     if (!pubKeyJwk) {
                         pubKeyJwk = await initUserKeys(user.uid);
                         const freshKeys = await getStoredKey(user.uid);
@@ -982,7 +989,7 @@ export const initAuth = () => {
                 }
                 if (phoneError) phoneError.textContent = friendlyMessage;
             }
-            
+
             // Clean up and reset Recaptcha on error so next attempt gets a fresh verifier
             if (window.recaptchaVerifier) {
                 try {
@@ -1008,7 +1015,7 @@ export const initAuth = () => {
         const descEl = elements.logoutModal.querySelector('p');
         const confirmBtn = elements.confirmLogoutBtn;
         const cancelBtn = elements.cancelLogoutBtn;
-        
+
         if (isLinked) {
             if (titleEl) titleEl.textContent = "Linked Device";
             if (descEl) descEl.textContent = "This device is linked to your primary account. It can only be logged out remotely from your primary device's settings (Settings > Linked Devices).";
