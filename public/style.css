@@ -9,8 +9,10 @@
     --brand-dark: #008069;
     --border: #d1d7db;
     --shadow: 0 2px 5px rgba(11, 20, 26, .08);
-    --wa-sent: #dcf8c6;
-    --wa-received: #ffffff;
+    --wa-sent: rgb(81,255,124);
+    --wa-received: rgb(143,241,239);
+    --wa-sent-text: #111b21;
+    --wa-received-text: #111b21;
 }
 
 /* Dark Theme */
@@ -25,8 +27,10 @@ body.dark-theme {
     --brand-dark: #008069;
     --border: #2a3942;
     --shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    --wa-sent: #005c4b;
-    --wa-received: #202c33;
+    --wa-sent: rgb(81,255,124);
+    --wa-received: rgb(143,241,239);
+    --wa-sent-text: #111b21;
+    --wa-received-text: #111b21;
 }
 
 /* OLED Theme (True Black) */
@@ -41,8 +45,10 @@ body.oled-theme {
     --brand-dark: #008069;
     --border: #d1d7db;
     --shadow: 0 2px 5px rgba(11, 20, 26, .08);
-    --wa-sent: #dcf8c6;
-    --wa-received: #ffffff;
+    --wa-sent: rgb(81,255,124);
+    --wa-received: rgb(143,241,239);
+    --wa-sent-text: #111b21;
+    --wa-received-text: #111b21;
 }
 
 body.oled-theme {
@@ -57,10 +63,12 @@ body.oled-theme {
     --brand-dark: #008069;
     --border: #2a3942;
     --shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-    --wa-sent: #004d3f;
+    --wa-sent: rgb(81,255,124);
     /* Slightly darker green for OLED */
-    --wa-received: #1a1a1a;
+    --wa-received: rgb(143,241,239);
     /* Very dark gray for received */
+    --wa-sent-text: #111b21;
+    --wa-received-text: #111b21;
 }
 
 * {
@@ -1981,13 +1989,15 @@ iframe {
 }
 
 .message-group.received .message-bubble {
-    background: var(--wa-received);
-    color: var(--wa-received-text);
+    background-color: var(--wa-received) !important;
+    background-image: none !important;
+    color: var(--wa-received-text) !important;
 }
 
 .message-group.sent .message-bubble {
-    background: var(--wa-sent);
-    color: var(--wa-sent-text);
+    background-color: var(--wa-sent) !important;
+    background-image: none !important;
+    color: var(--wa-sent-text) !important;
 }
 
 /* Tails for the first message in a group */

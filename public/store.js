@@ -1249,7 +1249,7 @@ const updateSelectionUI = () => {
 /**
  * Triggers a full grid refresh using cached data
  */
-export const refreshStoreGrids = async () => {
+export const refreshStoreGrids = async ({ suppressShopAccessModal = false } = {}) => {
     // Render products for both Admin (Inventory) and Shop grids
     renderGrids(cachedProducts);
 
@@ -1260,21 +1260,23 @@ export const refreshStoreGrids = async () => {
         currentUserProfile = await getUserProfile(user.uid);
     }
     const currentActiveChatUid = getActiveChatUid();
-    const sellerProfile = currentActiveChatUid ? allUsersCache[currentActiveChatUid] : null;
+    const activeShopSellerUid = typeof window.getActiveShopSellerId === 'function' ? window.getActiveShopSellerId() : null;
+    const sellerUidToUse = activeShopSellerUid || currentActiveChatUid;
+    const sellerProfile = sellerUidToUse ? allUsersCache[sellerUidToUse] : null;
 
     const activeBuyerLoc = getBuyerLocation();
-    if (currentActiveChatUid) { // If there's an active chat, fetch the business profile of the other user
+    if (sellerUidToUse) { // If there is a shop seller ID available, fetch that seller's business profile
         try {
-            const bizProfile = await getBusinessProfile(currentActiveChatUid);
-            await updateShopPickupLocations(bizProfile, activeBuyerLoc, currentUserProfile, moduleFriendsList, sellerProfile);
+            const bizProfile = await getBusinessProfile(sellerUidToUse, { skipCache: true });
+            await updateShopPickupLocations(bizProfile, activeBuyerLoc, currentUserProfile, moduleFriendsList, sellerProfile, { suppressShopAccessModal });
         } catch (error) {
             console.error("Error fetching business profile for shop:", error);
-            await updateShopPickupLocations(null, activeBuyerLoc, currentUserProfile, moduleFriendsList, sellerProfile);
+            await updateShopPickupLocations(null, activeBuyerLoc, currentUserProfile, moduleFriendsList, sellerProfile, { suppressShopAccessModal });
         }
-    } else if (user) { // If no active chat, but user is logged in, still pass current user profile
-        await updateShopPickupLocations(null, activeBuyerLoc, currentUserProfile, moduleFriendsList, null);
+    } else if (user) { // If no active chat/shop seller, but user is logged in, still pass current user profile
+        await updateShopPickupLocations(null, activeBuyerLoc, currentUserProfile, moduleFriendsList, null, { suppressShopAccessModal });
     } else {
-        await updateShopPickupLocations(null, activeBuyerLoc, null, moduleFriendsList); // No active user, no active chat
+        await updateShopPickupLocations(null, activeBuyerLoc, null, moduleFriendsList, null, { suppressShopAccessModal }); // No active user, no active chat
     }
 };
 

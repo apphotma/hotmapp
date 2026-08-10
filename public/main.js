@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { App } = window.Capacitor.Plugins;
         App.addListener('appStateChange', ({ isActive }) => {
             if (isActive) {
-                refreshStoreGrids();
+                refreshStoreGrids({ suppressShopAccessModal: true });
             }
         });
     }

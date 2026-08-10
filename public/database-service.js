@@ -1537,10 +1537,13 @@ export const saveBusinessProfile = async (userId, businessData) => {
 /**
  * Fetches a user's business profile.
  */
-export const getBusinessProfile = async (userId) => {
-    let cachedShop = await getCachedItem('shops', userId);
-    if (cachedShop) {
-        return cachedShop;
+export const getBusinessProfile = async (userId, { skipCache = false } = {}) => {
+    let cachedShop = null;
+    if (!skipCache) {
+        cachedShop = await getCachedItem('shops', userId);
+        if (cachedShop) {
+            return cachedShop;
+        }
     }
 
     const isSelf = auth.currentUser && userId === auth.currentUser.uid;

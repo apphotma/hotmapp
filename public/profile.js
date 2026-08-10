@@ -6,12 +6,12 @@ import { hideElement, showElement, getAvatarUrl, compressImage, cropToSquare } f
 import { subscribeToAuthChanges } from './auth-service.js';
 
 export const initProfile = () => {
-    const DEFAULT_SENT_COLOR = '#dcf8c6';
-    const DEFAULT_RECEIVED_COLOR = '#ffffff';
+    const DEFAULT_SENT_COLOR = 'rgb(81,255,124)';
+    const DEFAULT_RECEIVED_COLOR = 'rgb(143,241,239)';
     const DEFAULT_SEND_ON_ENTER = false;
     const DEFAULT_MESSAGE_FONT_SIZE = 18;
-    const DEFAULT_SENT_TEXT_COLOR = '#000000';
-    const DEFAULT_RECEIVED_TEXT_COLOR = '#000000';
+    const DEFAULT_SENT_TEXT_COLOR = '#111b21';
+    const DEFAULT_RECEIVED_TEXT_COLOR = '#111b21';
     let openedFromSettings = false;
 
     const updateDeleteButtonVisibility = () => {

@@ -20,8 +20,20 @@ let cachedShopLocations = [];
 let currentShopSellerId = null;
 let selectedPickupLocation = null;
 let cachedBizProfile = null;
+let cachedBizProfileOwnerId = null;
 let cachedDeliveryFee = 0;
 let currentTransportMode = 'driving';
+
+const getCartOwnerId = () => currentShopSellerId || getActiveChatUid();
+const resetSellerContext = (sellerId) => {
+    const normalizedSellerId = sellerId ? String(sellerId).trim() : null;
+    currentShopSellerId = normalizedSellerId;
+    if (normalizedSellerId !== cachedBizProfileOwnerId) {
+        cachedBizProfile = null;
+        cachedBizProfileOwnerId = normalizedSellerId;
+    }
+    refreshCart();
+};
 let currentMapLocations = [];
 let currentMapUserCoords = null;
 let currentMapAllTravelTimes = []; // Stores travel times for all modes for each location
@@ -63,6 +75,10 @@ let cachedMinFreeDelivery = 0;
 let deliveryMethod = 'pickup'; // State: 'pickup' or 'delivery'
 let addressMode = 'simple'; // 'simple' or 'structured'
 
+const normalizeServiceType = (value) => {
+    return String(value || '').trim().toLowerCase();
+};
+
 let shopLocationsMapInstance = null;
 let shopLocationsMarkers = L.layerGroup(); // To manage markers easily
 
@@ -75,7 +91,7 @@ export const refreshCart = () => {
     cachedDeliveryFee = 0;
     cachedMinFreeDelivery = 0;
     deliveryMethod = 'pickup';
-    const currentActiveChatUid = getActiveChatUid();
+    const currentActiveChatUid = getCartOwnerId();
     const cartKey = currentActiveChatUid ? `hotmapp_cart_${currentActiveChatUid}` : 'hotmapp_cart_data';
     const savedKey = currentActiveChatUid ? `hotmapp_saved_${currentActiveChatUid}` : 'hotmapp_saved_data';
 
@@ -116,12 +132,15 @@ const updateAddressUI = () => {
  * @param {object} bizProfile - The business profile object.
  * @param {object|null} userCoords - Current user location {lat, lng}.
  */
-export const updateShopPickupLocations = async (bizProfile, userCoords = null, currentUserProfile = null, moduleFriendsList = {}, sellerProfile = null) => {
-    cachedBizProfile = bizProfile;
-    const locations = bizProfile?.pickupLocations || [];
-    const serviceType = bizProfile?.serviceType || 'pickup';
-    cachedDeliveryFee = parsePrice(bizProfile?.deliveryFee || 0);
-    cachedMinFreeDelivery = parsePrice(bizProfile?.minFreeDelivery || 0);
+export const updateShopPickupLocations = async (bizProfile, userCoords = null, currentUserProfile = null, moduleFriendsList = {}, sellerProfile = null, { suppressShopAccessModal = false } = {}) => {
+    cachedBizProfile = bizProfile || sellerProfile?.businessProfile || null;
+    const locations = bizProfile?.pickupLocations || cachedBizProfile?.pickupLocations || [];
+    let serviceType = normalizeServiceType(bizProfile?.serviceType || cachedBizProfile?.serviceType || 'pickup');
+    if (!['pickup', 'delivery', 'both'].includes(serviceType)) {
+        serviceType = 'pickup';
+    }
+    cachedDeliveryFee = parsePrice((bizProfile?.deliveryFee ?? cachedBizProfile?.deliveryFee) || 0);
+    cachedMinFreeDelivery = parsePrice((bizProfile?.minFreeDelivery ?? cachedBizProfile?.minFreeDelivery) || 0);
 
     // Update Shop Header with Category and Name
     if (elements.shopCategoryDisplay) {
@@ -158,10 +177,12 @@ export const updateShopPickupLocations = async (bizProfile, userCoords = null, c
         }
 
         if (blockReason) {
-            if (shopContainer) shopContainer.style.display = 'none'; // Hide the shop content
-            if (shopNoResultsMessage) shopNoResultsMessage.style.display = 'none'; // Ensure search message is hidden
-            await openShopAccessRequestModal(currentActiveChatUid, sellerProfile, blockReason, null, showRequestBtn);
-            return; // Block shop view entirely
+            if (!suppressShopAccessModal) {
+                if (shopContainer) shopContainer.style.display = 'none'; // Hide the shop content
+                if (shopNoResultsMessage) shopNoResultsMessage.style.display = 'none'; // Ensure search message is hidden
+                await openShopAccessRequestModal(currentActiveChatUid, sellerProfile, blockReason, null, showRequestBtn);
+            }
+            return; // Block shop view entirely or skip the access prompt on resume
         } else {
             if (shopContainer) shopContainer.style.display = 'flex'; // Ensure shop is visible if not blocked
             if (shopNoResultsMessage) shopNoResultsMessage.style.display = 'none'; // Hide any previous block message
@@ -199,16 +220,27 @@ export const updateShopPickupLocations = async (bizProfile, userCoords = null, c
 
     // 1. Update Cart Fulfillment Options
     if (elements.cartDeliverySection) {
-        elements.cartDeliverySection.style.display = canDeliver ? 'block' : 'none';
-        if (elements.pickupOptionWrapper) elements.pickupOptionWrapper.style.display = canPickup ? 'flex' : 'none';
+        if (!canPickup && !canDeliver) {
+            elements.cartDeliverySection.style.display = 'none';
+        } else {
+            elements.cartDeliverySection.style.display = canDeliver ? 'block' : 'none';
+        }
 
-        // Auto-select Delivery if Pickup is not available
-        if (canDeliver && !canPickup) {
+        if (elements.pickupOptionWrapper) {
+            elements.pickupOptionWrapper.style.display = canPickup ? 'flex' : 'none';
+        }
+
+        if (!canPickup && canDeliver) {
             deliveryMethod = 'delivery';
-            if (elements.deliveryMethodDelivery) elements.deliveryMethodDelivery.checked = true;
         } else {
             deliveryMethod = 'pickup';
-            if (elements.deliveryMethodPickup) elements.deliveryMethodPickup.checked = true;
+        }
+
+        if (elements.deliveryMethodDelivery) {
+            elements.deliveryMethodDelivery.checked = deliveryMethod === 'delivery';
+        }
+        if (elements.deliveryMethodPickup) {
+            elements.deliveryMethodPickup.checked = deliveryMethod === 'pickup';
         }
 
         if (elements.deliveryAddressContainer) {
@@ -464,10 +496,10 @@ export const initShop = () => {
         const activeUid = getActiveChatUid();
         const activeConversationUid = document.querySelector('.conversation-item.active')?.dataset.uid || null;
         const sellerId = resolveActiveSellerId({
+            shopSellerId: currentShopSellerId,
             activeChatUid: activeUid,
             activeConversationUid,
-            currentUserId: auth.currentUser?.uid || null,
-            shopSellerId: currentShopSellerId
+            currentUserId: auth.currentUser?.uid || null
         });
         if (sellerId) {
             currentShopSellerId = sellerId;
@@ -491,9 +523,10 @@ export const initShop = () => {
         });
 
         if (sellerId) {
-            currentShopSellerId = sellerId;
+            resetSellerContext(sellerId);
             loadAndRenderSellerShop(sellerId);
         } else {
+            resetSellerContext(null);
             if (elements.shopProductGrid) {
                 elements.shopProductGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--muted);">Select a chat to view its shop.</div>';
             }
@@ -591,7 +624,7 @@ export const initShop = () => {
     window.closeShopMode = closeShopMode;
     window.showProductDetails = showProductDetails;
     window.setActiveShopSellerId = (sellerId) => {
-        currentShopSellerId = sellerId || null;
+        resetSellerContext(sellerId);
         return currentShopSellerId;
     };
     window.getActiveShopSellerId = () => currentShopSellerId;
@@ -833,7 +866,28 @@ export const initShop = () => {
     /**
      * Opens a read-only modal displaying the seller's business profile details.
      */
-    const openSellerBusinessProfileModal = () => {
+    const openSellerBusinessProfileModal = async () => {
+        const sellerId = currentShopSellerId || getActiveChatUid();
+        if (!cachedBizProfile || sellerId !== cachedBizProfileOwnerId) {
+            if (sellerId) {
+                cachedBizProfile = null;
+                cachedBizProfileOwnerId = sellerId;
+                try {
+                    const sellerProfile = await getUserProfile(sellerId);
+                    if (sellerProfile?.businessProfile) {
+                        cachedBizProfile = sellerProfile.businessProfile;
+                    } else {
+                        const fetchedProfile = await getBusinessProfile(sellerId);
+                        if (fetchedProfile) {
+                            cachedBizProfile = fetchedProfile;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to fetch seller business profile for Buz Info:', error);
+                }
+            }
+        }
+
         if (!cachedBizProfile) {
             showToast("No business profile data available for this seller.", "error");
             return;
@@ -1349,7 +1403,7 @@ const handleStarRating = (e) => {
         }
 
         // Persist to user-specific localStorage
-        const currentActiveChatUid = getActiveChatUid();
+        const currentActiveChatUid = getCartOwnerId();
         const cartKey = currentActiveChatUid ? `hotmapp_cart_${currentActiveChatUid}` : 'hotmapp_cart_data';
         const savedKey = currentActiveChatUid ? `hotmapp_saved_${currentActiveChatUid}` : 'hotmapp_saved_data';
 
