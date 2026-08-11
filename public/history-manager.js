@@ -7,6 +7,26 @@ const pendingPushQueue = [];
 let isBackPending = false;
 let backPendingTimeoutId = null;
 
+const isNativeApp = () => !!(window.Capacitor?.Plugins?.App);
+
+const getHistoryUrl = (id) => {
+    const base = `${window.location.pathname}${window.location.search}`;
+    if (isNativeApp()) {
+        return base;
+    }
+    return id === 'base' ? base : `${base}#${encodeURIComponent(id)}`;
+};
+
+const readHistoryIdFromLocation = () => {
+    if (window.history.state?.hotmappState) {
+        return window.history.state.hotmappState;
+    }
+    if (window.location.hash) {
+        return decodeURIComponent(window.location.hash.slice(1));
+    }
+    return 'base';
+};
+
 const processPendingPushes = () => {
     while (pendingPushQueue.length > 0) {
         const { id, closeFn } = pendingPushQueue.shift();
@@ -47,7 +67,7 @@ export const pushHistoryState = (id, closeFn) => {
     historyStack.push(state);
 
     // Push a state to the browser's history API.
-    window.history.pushState({ hotmappState: id }, '', window.location.pathname);
+    window.history.pushState({ hotmappState: id }, '', getHistoryUrl(id));
 };
 
 /**
@@ -61,7 +81,7 @@ export const replaceHistoryState = (id, closeFn) => {
     } else {
         historyStack.push({ id, closeFn });
     }
-    window.history.replaceState({ hotmappState: id }, '', window.location.pathname);
+    window.history.replaceState({ hotmappState: id }, '', getHistoryUrl(id));
 };
 
 /**
@@ -102,7 +122,7 @@ const handlePopState = (event) => {
         backPendingTimeoutId = null;
     }
 
-    const targetStateId = event.state?.hotmappState || 'base';
+    const targetStateId = event.state?.hotmappState || readHistoryIdFromLocation() || 'base';
 
     // Close and pop states from our stack until the top of stack matches targetStateId
     while (historyStack.length > 0 && historyStack[historyStack.length - 1].id !== targetStateId) {
@@ -126,6 +146,12 @@ const handlePopState = (event) => {
             targetEl.dataset.skipPush = 'true';
             targetEl.style.display = prevDisplay;
         }
+    }
+
+    // Fallback: if there is no matching state and we've returned to the base state,
+    // notify the app so any UI that is still open can close itself.
+    if (targetStateId === 'base' && historyStack.length === 0) {
+        window.dispatchEvent(new CustomEvent('hotmapp-browser-back-to-base'));
     }
 
     processPendingPushes();
@@ -213,11 +239,15 @@ if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
  */
 export const initHistoryManager = () => {
     // Set the initial state so we have a baseline.
+    const initialStateId = readHistoryIdFromLocation();
     if (!window.history.state || !window.history.state.hotmappState) {
-        window.history.replaceState({ hotmappState: 'base' }, '', window.location.pathname);
+        window.history.replaceState({ hotmappState: initialStateId }, '', getHistoryUrl(initialStateId));
     }
 
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', () => {
+        handlePopState({ state: window.history.state });
+    });
     initModalObserver();
     console.log("History Manager Initialized.");
 

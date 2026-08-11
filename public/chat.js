@@ -8149,7 +8149,7 @@ const showChatListView = () => {
     }
 
     if (history.state && history.state.view === 'chat') {
-        history.replaceState({ hotmappState: 'base', view: 'list' }, '', window.location.pathname);
+        history.replaceState({ hotmappState: 'base' }, '', window.location.pathname);
     }
     // Multitasking: Auto-minimize active call on back button click
     if (peerConnections.size > 0) {
@@ -8170,6 +8170,12 @@ window.addEventListener('hotmapp-back-button', () => {
             toggleCallMinimize(true);
             return;
         }
+        showChatListView();
+    }
+});
+
+window.addEventListener('hotmapp-browser-back-to-base', () => {
+    if (elements.chatContainer?.classList.contains('viewing-chat')) {
         showChatListView();
     }
 });
@@ -8380,7 +8386,8 @@ export const initChatSelection = () => {
                 const contentToShare = [sharedTitle, sharedText, sharedUrl].filter(Boolean).join('\n');
 
                 // Clean URL query parameters immediately to avoid triggering the share modal repeatedly on refreshes
-                window.history.replaceState({ view: 'list' }, document.title, window.location.pathname);
+                const baseState = { hotmappState: window.history.state?.hotmappState || 'base' };
+                window.history.replaceState(baseState, document.title, window.location.pathname);
 
                 pendingForwardData = [{ text: contentToShare }];
 
@@ -8402,8 +8409,9 @@ export const initChatSelection = () => {
             const inviteGroupId = localStorage.getItem('pending_group_invite') || urlParams.get('invite');
             if (inviteGroupId) {
                 // Clean URL query parameters immediately to avoid triggering modal repeatedly on refreshes
+                const baseState = { hotmappState: window.history.state?.hotmappState || 'base' };
                 const newUrl = window.location.pathname;
-                window.history.replaceState({ view: 'list' }, document.title, newUrl);
+                window.history.replaceState(baseState, document.title, newUrl);
 
                 setTimeout(async () => {
                     await handleGroupInviteLink(inviteGroupId);

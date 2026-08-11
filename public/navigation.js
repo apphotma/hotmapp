@@ -259,6 +259,16 @@ export const initNavigation = () => {
         elements.chatConversationList?.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
+    // Browser back fallback for non-chat tabs: return to the chat list page
+    window.addEventListener('hotmapp-browser-back-to-base', () => {
+        if (!elements.chatsNav?.classList.contains('active')) {
+            switchTab(elements.chatsNav,
+                [elements.chatSidebar, elements.chatArea],
+                [elements.custSidebar, elements.storeArea, elements.generalMarketArea, elements.starredSidebar, elements.callsSidebar, elements.archivedSidebar, elements.lockedChatsSidebar]
+            );
+        }
+    });
+
     // Navigation: Calls
     elements.callsNav?.addEventListener('click', function() {
         switchTab(this, 
@@ -431,4 +441,4 @@ export const openStoreView = () => {
     }
 };
 
-window.openStoreView = openStoreView;
+window.openStoreView = openStoreView;
