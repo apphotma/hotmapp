@@ -1,5 +1,6 @@
 package com.hotmapp.app;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -34,6 +35,12 @@ public class HotmappFirebaseMessagingService extends FirebaseMessagingService {
 
             Map<String, String> data = remoteMessage.getData();
             if (data == null || data.isEmpty()) return;
+
+            final String type = data.get("type");
+            if (type != null && type.equals("incoming_call")) {
+                showIncomingCallNotification(data);
+                return;
+            }
 
             final String ackUrl = data.get("ackUrl");
             final String deliveryToken = data.get("deliveryToken");
@@ -88,6 +95,58 @@ public class HotmappFirebaseMessagingService extends FirebaseMessagingService {
             showNotification(title, body, data);
         } catch (Exception ex) {
             Log.w(TAG, "onMessageReceived error: " + ex.getMessage(), ex);
+        }
+    }
+
+    private void showIncomingCallNotification(Map<String, String> data) {
+        String callerName = data.get("callerName");
+        String callId = data.get("callId");
+
+        CallNotificationHelper.createCallChannel(this);
+
+        Intent fullScreenIntent = new Intent(this, IncomingCallActivity.class);
+        fullScreenIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId);
+        fullScreenIntent.putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName);
+        fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                fullScreenIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Intent acceptIntent = new Intent(this, IncomingCallReceiver.class);
+        acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ACTION, IncomingCallActivity.ACTION_ACCEPT);
+        acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId);
+        acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName);
+
+        PendingIntent acceptPendingIntent = PendingIntent.getBroadcast(
+                this,
+                1,
+                acceptIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Intent rejectIntent = new Intent(this, IncomingCallReceiver.class);
+        rejectIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ACTION, IncomingCallActivity.ACTION_REJECT);
+        rejectIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId);
+        rejectIntent.putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName);
+
+        PendingIntent rejectPendingIntent = PendingIntent.getBroadcast(
+                this,
+                2,
+                rejectIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Notification notification = CallNotificationHelper.buildIncomingCallNotification(
+                this,
+                fullScreenPendingIntent,
+                acceptPendingIntent,
+                rejectPendingIntent,
+                callerName);
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.notify(callId != null ? callId.hashCode() : (int) System.currentTimeMillis(), notification);
         }
     }
 

@@ -109,6 +109,16 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
+        <receiver android:name=".IncomingCallReceiver" android:exported="false" />
+
         <!-- Firebase messaging service to ACK deliveries even when app is backgrounded/killed -->
         <service
             android:name=".HotmappFirebaseMessagingService"

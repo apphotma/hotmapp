@@ -4,4 +4,7 @@
     <string name="title_activity_main">hotmapp</string>
     <string name="package_name">com.hotmapp.app</string>
     <string name="custom_url_scheme">com.hotmapp.app</string>
+    <string name="incoming_call_title">Incoming call</string>
+    <string name="accept_call">Accept</string>
+    <string name="reject_call">Reject</string>
 </resources>

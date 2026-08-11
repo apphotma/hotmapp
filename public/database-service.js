@@ -219,7 +219,7 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
     await set(newMessageRef, {
         ...messageData,
         timestamp: timestamp,
-        status: 'notified',
+        status: messageData.status || 'notified',
         isEncrypted: messageData.isEncrypted !== undefined ? messageData.isEncrypted : null,
         iv: messageData.iv !== undefined ? messageData.iv : null,
         chatId: messageData.chatId || chatId
@@ -513,8 +513,8 @@ export const markMessagesAsDelivered = async (chatId, currentUserId) => {
         snapshot.forEach((childSnap) => {
             if (childSnap.key === 'pinnedMessage') return;
             const msg = childSnap.val();
-            // If the message was sent to me and is still only 'sent', upgrade it to 'delivered'
-            if (msg.senderId !== currentUserId && msg.status === 'sent') {
+            // If the message was sent to me and is still only 'sent' or 'notified', upgrade it to 'delivered'
+            if (msg.senderId !== currentUserId && (msg.status === 'sent' || msg.status === 'notified')) {
                 updates[`${childSnap.key}/status`] = 'delivered';
             }
         });

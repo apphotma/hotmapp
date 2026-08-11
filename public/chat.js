@@ -4203,42 +4203,15 @@ const endCall = async () => {
     elements.callOverlay?.classList.remove('minimized');
     currentFacingMode = 'user';
 
-    try {
-        await clearCallSignal(auth.currentUser.uid);
-    } catch (clearErr) {
-        console.warn("Failed to clear call signal on database:", clearErr);
-    }
-
-    if (auth.currentUser) {
-        const user = auth.currentUser;
-        const promises = Array.from(callParticipants).map(pUid => {
-            return sendCallSignal(pUid, user.uid, { status: 'ended', from: user.uid })
-                .catch(err => console.warn(`Failed to send end signal to ${pUid}:`, err));
-        });
-        try {
-            await Promise.all(promises);
-        } catch (signalErr) {
-            console.warn("Failed to dispatch ended signals:", signalErr);
-        }
-    }
-
-    try {
-        if (callLoggingSession && currentCallPartnerUid) {
-            if (duration > 0) {
-                if (isLocalCaller) {
-                    await recordCallInChat(currentCallPartnerUid, currentCallType, 'completed', duration, auth.currentUser.uid);
-                }
-                await saveCallLog(auth.currentUser.uid, { ...callLoggingSession, status: 'completed', duration });
-            } else if (!callStartTime && callLoggingSession.type === 'outgoing' && !['missed', 'busy', 'declined'].includes(callLoggingSession.status)) {
-                await recordCallInChat(currentCallPartnerUid, currentCallType, 'cancelled', 0, auth.currentUser.uid);
-                await saveCallLog(auth.currentUser.uid, { ...callLoggingSession, status: 'cancelled' });
-            } else if (!callStartTime && callLoggingSession.type === 'incoming' && callLoggingSession.status === 'declined') {
-                await recordCallInChat(currentCallPartnerUid, currentCallType, 'declined', 0, currentCallPartnerUid);
-            }
-        }
-    } catch (logErr) {
-        console.warn("Failed to save call logs in endCall:", logErr);
-    }
+    const cleanupData = {
+        userUid: auth.currentUser?.uid,
+        partnerUid: currentCallPartnerUid,
+        callType: currentCallType,
+        duration,
+        isLocalCaller,
+        loggingSession: callLoggingSession ? { ...callLoggingSession } : null,
+        participants: Array.from(callParticipants)
+    };
 
     callLoggingSession = null;
     callStartTime = null;
@@ -4252,6 +4225,43 @@ const endCall = async () => {
     if (elements.callOverlay) elements.callOverlay.style.display = 'none';
     if (elements.incomingCallOverlay) elements.incomingCallOverlay.style.display = 'none';
     showToast("Call ended", "info");
+
+    (async (data) => {
+        if (!data.userUid) return;
+
+        try {
+            await clearCallSignal(data.userUid);
+        } catch (clearErr) {
+            console.warn("Failed to clear call signal on database:", clearErr);
+        }
+
+        const promises = data.participants.map(pUid => {
+            return sendCallSignal(pUid, data.userUid, { status: 'ended', from: data.userUid })
+                .catch(err => console.warn(`Failed to send end signal to ${pUid}:`, err));
+        });
+        try {
+            await Promise.all(promises);
+        } catch (signalErr) {
+            console.warn("Failed to dispatch ended signals:", signalErr);
+        }
+
+        if (!data.loggingSession || !data.partnerUid) return;
+        try {
+            if (data.duration > 0) {
+                if (data.isLocalCaller) {
+                    await recordCallInChat(data.partnerUid, data.callType, 'completed', data.duration, data.userUid);
+                }
+                await saveCallLog(data.userUid, { ...data.loggingSession, status: 'completed', duration: data.duration });
+            } else if (data.loggingSession.type === 'outgoing' && !['missed', 'busy', 'declined'].includes(data.loggingSession.status)) {
+                await recordCallInChat(data.partnerUid, data.callType, 'cancelled', 0, data.userUid);
+                await saveCallLog(data.userUid, { ...data.loggingSession, status: 'cancelled' });
+            } else if (data.loggingSession.type === 'incoming' && data.loggingSession.status === 'declined') {
+                await recordCallInChat(data.partnerUid, data.callType, 'declined', 0, data.partnerUid);
+            }
+        } catch (logErr) {
+            console.warn("Failed to save call logs in endCall:", logErr);
+        }
+    })(cleanupData);
 };
 
 const updatePipButtonVisibility = () => {
@@ -7209,9 +7219,11 @@ const sendMessage = async () => {
                 showToast('You are offline. Message queued and will send when you are back online.', 'info');
             } else {
                 try {
-                    await saveMessage(chatId, pendingMessageData, messageId);
+                    // When online, mark the message as 'sent' for 1:1 chats, 'notified' for groups
+                    const savedMessageData = { ...pendingMessageData, status: chatId.startsWith('group_') ? 'notified' : 'sent' };
+                    await saveMessage(chatId, savedMessageData, messageId);
                     removePendingMessageFromQueue(messageId);
-                    const displayMsg = { ...pendingMessageData, status: 'notified' };
+                    const displayMsg = { ...savedMessageData };
                     if (displayMsg.isEncrypted) {
                         try {
                             await decryptMessageInPlace(displayMsg, { cache: false });
@@ -7219,7 +7231,7 @@ const sendMessage = async () => {
                             console.warn('Failed to decrypt outgoing message locally:', decryptError);
                         }
                     }
-                    // Update the rendered message to 'sent'
+                    // Update the rendered message to show 'sent' (or 'notified' for groups)
                     displayMessage(displayMsg, false);
                 } catch (error) {
                     const message = error && error.message ? error.message : String(error);
