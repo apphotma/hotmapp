@@ -5657,21 +5657,47 @@ const initCustomAudioPlayer = (messageId, audioUrl) => {
     playerEl.audioInstance = audio;
 };
 
+const ENCRYPTED_BACKGROUND_PLACEHOLDER = "This message is decrypting in the background. Reopen the chat to see the real text.";
+
+const looksLikeEncryptedText = (text) => {
+    if (!text || typeof text !== 'string') return false;
+    const stripped = text.replace(/\s+/g, '');
+    if (stripped.length < 40) return false;
+    const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+    return base64Pattern.test(stripped);
+};
+
+const isLikelyEncryptedMessage = (msg) => {
+    if (!msg || msg.isDecrypted) return false;
+    if (msg.isEncrypted) return true;
+    if (msg.iv || msg.ciphertext) return true;
+    return looksLikeEncryptedText(msg.text);
+};
+
 const getMessageTextForDisplay = (msg, currentUser) => {
     if (!msg) return '';
 
     const textValue = normalizeMessageText(msg.text);
     const previewValue = msg.previewText ? normalizeMessageText(msg.previewText) : '';
+    const isEncryptedPending = isLikelyEncryptedMessage(msg);
 
-    if (msg.isEncrypted && !msg.isDecrypted && previewValue) {
-        if (msg.text && msg.text.startsWith("🔒")) {
-            return msg.text;
-        }
-        // Senders should see their own plaintext preview immediately.
-        if (msg.senderId === currentUser?.uid) {
+    if (isEncryptedPending) {
+        if (previewValue) {
+            if (msg.text && msg.text.startsWith("🔒")) {
+                return msg.text;
+            }
+            // Senders should see their own plaintext preview immediately.
+            if (msg.senderId === currentUser?.uid) {
+                return previewValue;
+            }
             return previewValue;
         }
-        return previewValue;
+
+        if (!msg._decryptionToastShown) {
+            showToast("This encrypted message is decrypting in the background. Reopen the chat to see the real text.", "info");
+            msg._decryptionToastShown = true;
+        }
+        return ENCRYPTED_BACKGROUND_PLACEHOLDER;
     }
 
     return textValue;
@@ -8123,7 +8149,7 @@ const showChatListView = () => {
     }
 
     if (history.state && history.state.view === 'chat') {
-        history.replaceState({ view: 'list' }, '', window.location.pathname);
+        history.replaceState({ hotmappState: 'base', view: 'list' }, '', window.location.pathname);
     }
     // Multitasking: Auto-minimize active call on back button click
     if (peerConnections.size > 0) {
@@ -8131,8 +8157,19 @@ const showChatListView = () => {
     }
 };
 
+// Always minimize the call overlay when requested by native back button
+window.addEventListener('hotmapp-minimize-call', () => {
+    if (peerConnections.size > 0) {
+        toggleCallMinimize(true);
+    }
+});
+
 window.addEventListener('hotmapp-back-button', () => {
     if (elements.chatContainer?.classList.contains('viewing-chat')) {
+        if (peerConnections.size > 0 && currentCallType === 'video' && elements.callOverlay?.classList.contains('video-mode')) {
+            toggleCallMinimize(true);
+            return;
+        }
         showChatListView();
     }
 });

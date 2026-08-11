@@ -47,7 +47,7 @@ export const pushHistoryState = (id, closeFn) => {
     historyStack.push(state);
 
     // Push a state to the browser's history API.
-    window.history.pushState({ hotmappState: id }, '');
+    window.history.pushState({ hotmappState: id }, '', window.location.pathname);
 };
 
 /**
@@ -61,7 +61,7 @@ export const replaceHistoryState = (id, closeFn) => {
     } else {
         historyStack.push({ id, closeFn });
     }
-    window.history.replaceState({ hotmappState: id }, '');
+    window.history.replaceState({ hotmappState: id }, '', window.location.pathname);
 };
 
 /**
@@ -140,7 +140,7 @@ const initModalObserver = () => {
         const hiddenTargets = [];
 
         mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'style') {
+if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
                 const target = mutation.target;
                 const display = window.getComputedStyle(target).display;
                 const isVisible = display !== 'none';
@@ -203,7 +203,7 @@ const initModalObserver = () => {
     const modals = document.querySelectorAll('.modal-overlay, .reset-modal, .header-dropdown-menu, .chat-header-menu, .selection-ellipsis-menu, .lightbox-modal, .cart-overlay');
     modals.forEach((modal) => {
         modal.dataset.lastDisplay = window.getComputedStyle(modal).display;
-        observer.observe(modal, { attributes: true, attributeFilter: ['style'] });
+        observer.observe(modal, { attributes: true, attributeFilter: ['style', 'class'] });
     });
 };
 
@@ -223,11 +223,22 @@ export const initHistoryManager = () => {
 
     // Capacitor Native Android/iOS Back Button Handler
     let backButtonRegistered = false;
+    const isActiveVideoCallOverlay = () => {
+        const callOverlay = document.querySelector('.call-overlay');
+        return callOverlay && callOverlay.style.display !== 'none' && callOverlay.classList.contains('video-mode') && !callOverlay.classList.contains('minimized');
+    };
+
     const registerCapacitorBackButton = () => {
         if (backButtonRegistered) return;
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
             const { App } = window.Capacitor.Plugins;
             App.addListener('backButton', (data) => {
+                if (isActiveVideoCallOverlay()) {
+                    // Dispatch dedicated minimize event so call UI always handles it
+                    window.dispatchEvent(new CustomEvent('hotmapp-minimize-call'));
+                    return;
+                }
+
                 const chatsTab = document.querySelector('[data-ui="nav-chats"]');
                 const chatContainer = document.querySelector('[data-ui="chat-container"]') || document.querySelector('.chat-container');
                 const isViewingChat = chatContainer && chatContainer.classList.contains('viewing-chat');
@@ -236,7 +247,7 @@ export const initHistoryManager = () => {
                     document.querySelectorAll('.modal-overlay, .lightbox-modal, .reset-modal, .header-dropdown-menu, .chat-header-menu, .selection-ellipsis-menu, .cart-overlay')
                 ).some(m => m.style.display !== 'none' && m.style.display !== '');
 
-                const isAtHomeChatsPage = chatsTab && chatsTab.classList.contains('active') && !isViewingChat && !visibleModals;
+                        const isAtHomeChatsPage = chatsTab && chatsTab.classList.contains('active') && !isViewingChat && !visibleModals;
 
                 if (isAtHomeChatsPage) {
                     App.minimizeApp();
@@ -276,6 +287,13 @@ export const initHistoryManager = () => {
     // Cordova-compatible fallback for backbutton event on document
     document.addEventListener('backbutton', (e) => {
         if (backButtonRegistered) return;
+
+        if (isActiveVideoCallOverlay()) {
+            e.preventDefault();
+            // Dispatch dedicated minimize event so call UI always handles it
+            window.dispatchEvent(new CustomEvent('hotmapp-minimize-call'));
+            return;
+        }
         
         const chatsTab = document.querySelector('[data-ui="nav-chats"]');
         const chatContainer = document.querySelector('[data-ui="chat-container"]') || document.querySelector('.chat-container');

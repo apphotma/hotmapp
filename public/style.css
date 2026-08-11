@@ -2323,8 +2323,11 @@ iframe {
 .reply-preview-text {
     font-size: 0.85rem;
     color: var(--muted);
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
     text-overflow: ellipsis;
 }
 

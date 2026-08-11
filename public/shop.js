@@ -1911,9 +1911,10 @@ const handleStarRating = (e) => {
                     throw new Error("jsPDF library is not loaded on this device.");
                 }
                 const doc = new jsPDFClass();
+                const invoiceBlue = [0, 0, 255];
                 
-                // Set default font to bold globally
-                doc.setFont(undefined, 'bold');
+                // Use normal font weight by default for a lighter invoice appearance
+                doc.setFont(undefined, 'normal');
 
                 // Add transparent watermark logo in the middle of the invoice page
                 if (transparentLogoBase64) {
@@ -2001,23 +2002,30 @@ const handleStarRating = (e) => {
                     currentX += doc.getTextWidth(prefix);
 
                     // Draw product name in blue
-                    doc.setTextColor(0, 0, 255);
+                    doc.setTextColor(...invoiceBlue);
                     const productName = item.name;
                     doc.text(productName, currentX, y);
                     currentX += doc.getTextWidth(productName);
 
-                    // Draw form/quantity details in black
-                    doc.setTextColor(0, 0, 0);
-                    if (detailText) {
-                        doc.text(detailText, currentX, y);
-                        currentX += doc.getTextWidth(detailText);
+                    // Draw form details in blue bracket
+                    if (item.form) {
+                        const formText = ` (${item.form})`;
+                        doc.text(formText, currentX, y);
+                        currentX += doc.getTextWidth(formText);
                     }
 
-                    // Draw pricing suffix in black
+                    // Draw quantity details in blue bracket after form
+                    if (item.quantity !== undefined && item.quantity !== null) {
+                        const qtyText = ` (Quantity: ${item.quantity})`;
+                        doc.text(qtyText, currentX, y);
+                        currentX += doc.getTextWidth(qtyText);
+                    }
+
+                    // Draw pricing suffix in blue
                     const suffix = ` (${item.currency}${formatPriceWithCommas(item.price)} x ${item.quantity})`;
                     doc.text(suffix, currentX, y);
 
-                    // Draw item total in black
+                    // Draw item total in blue
                     doc.text(`${item.currency}${itemTotal}`, 170, y, { align: 'right' });
                     y += 15;
                 });
@@ -2032,20 +2040,22 @@ const handleStarRating = (e) => {
                 const currency = cart[0].currency;
 
                 if (deliveryMethod === 'delivery' && isFreeDelivery) {
-                    doc.setFont(undefined, 'bold');
+                    doc.setFont(undefined, 'normal');
                     doc.setTextColor(18, 140, 126);
                     doc.text(`FREE DELIVERY APPLIED`, 170, y, { align: 'right' });
-                    doc.setTextColor(0, 0, 0);
+                    doc.setTextColor(...invoiceBlue);
                     y += 7;
                 } else if (shipping > 0) {
-                    doc.setFont(undefined, 'bold');
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(...invoiceBlue);
                     doc.text(`Subtotal: ${currency}${formatPriceWithCommas(subtotal)}`, 170, y, { align: 'right' });
                     y += 7;
                     doc.text(`Delivery Fee: ${currency}${formatPriceWithCommas(shipping)}`, 170, y, { align: 'right' });
                     y += 7;
                 }
 
-                doc.setFont(undefined, 'bold');
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(...invoiceBlue);
                 doc.text(`TOTAL AMOUNT: ${currency}${formatPriceWithCommas(total)}`, 170, y, { align: 'right' });
 
                 // Footer
