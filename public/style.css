@@ -624,6 +624,27 @@ iframe {
     gap: 4px;
     overflow: hidden;
     flex: 1;
+    position: relative;
+}
+
+.edit-contact-name-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.edit-contact-name-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .conversation-name {

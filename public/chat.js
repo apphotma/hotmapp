@@ -150,6 +150,153 @@ const escapeHtml = (text) => {
     });
 };
 
+const CONTACT_ALIASES_STORAGE_PREFIX = 'hotmapp_contact_aliases_';
+let activeAliasEditUid = null;
+
+const getContactAliasesStorageKey = () => {
+    const currentUser = auth.currentUser;
+    return currentUser ? `${CONTACT_ALIASES_STORAGE_PREFIX}${currentUser.uid}` : `${CONTACT_ALIASES_STORAGE_PREFIX}guest`;
+};
+
+const getContactAliases = () => {
+    try {
+        return JSON.parse(localStorage.getItem(getContactAliasesStorageKey()) || '{}') || {};
+    } catch (err) {
+        console.warn('Unable to parse contact aliases from localStorage', err);
+        return {};
+    }
+};
+
+export const getContactAlias = (uid) => {
+    if (!uid) return '';
+    const aliases = getContactAliases();
+    const alias = aliases[uid];
+    return typeof alias === 'string' ? alias.trim() : '';
+};
+
+const setContactAlias = (uid, alias) => {
+    if (!uid) return;
+    const aliases = getContactAliases();
+    const trimmed = typeof alias === 'string' ? alias.trim() : '';
+    if (trimmed) {
+        aliases[uid] = trimmed;
+    } else {
+        delete aliases[uid];
+    }
+    localStorage.setItem(getContactAliasesStorageKey(), JSON.stringify(aliases));
+};
+
+const getContactDisplayName = (uid, profile) => {
+    const alias = getContactAlias(uid);
+    if (alias) return alias;
+    if (profile) return profile.fullname || profile.name || 'Unknown User';
+    return 'Unknown User';
+};
+
+const ensureEditContactAliasModal = () => {
+    let modal = document.querySelector('[data-ui="edit-contact-alias-modal"]');
+    if (modal) return modal;
+
+    const template = `
+<div class="modal-overlay" data-ui="edit-contact-alias-modal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:20000;pointer-events:auto;">
+    <div class="modal-content auth-card" style="max-width:400px;padding:20px;border-radius:14px;box-shadow:0 10px 35px rgba(0,0,0,0.18);background:var(--panel, #ffffff);color:var(--text, #111b21);">
+        <div class="modal-header" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <h3 style="margin:0;font-size:1.1rem;">Edit contact name</h3>
+                <p data-ui="edit-contact-alias-hint" style="margin:6px 0 0;font-size:0.85rem;color:var(--muted);"></p>
+            </div>
+            <button type="button" class="close-modal" data-ui="close-edit-contact-alias-modal" title="Close">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <label for="edit-contact-alias-input" style="font-weight:600;color:var(--text);">Display name</label>
+            <input id="edit-contact-alias-input" data-ui="edit-contact-alias-input" type="text" placeholder="Enter a custom name" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);font-size:1rem;color:var(--text);">
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+                <button type="button" class="context-menu-item" data-ui="edit-contact-alias-cancel-btn" style="padding:10px 16px;border:none;background:#f3f3f3;color:var(--text);border-radius:10px;cursor:pointer;">Cancel</button>
+                <button type="button" class="context-menu-item" data-ui="edit-contact-alias-save-btn" style="padding:10px 16px;border:none;background:var(--brand);color:white;border-radius:10px;cursor:pointer;">Save</button>
+            </div>
+        </div>
+    </div>
+</div>`;
+    const container = document.createElement('div');
+    container.innerHTML = template;
+    modal = container.firstElementChild;
+    if (modal) {
+        document.body.appendChild(modal);
+        console.warn('Edit contact alias modal created dynamically because markup was missing.');
+    }
+    return modal;
+};
+
+const openEditContactAliasModal = (uid) => {
+    const modal = ensureEditContactAliasModal();
+    const input = modal?.querySelector('[data-ui="edit-contact-alias-input"]');
+    const nameHint = modal?.querySelector('[data-ui="edit-contact-alias-hint"]');
+    if (!modal || !input) {
+        console.warn('Edit contact alias modal or input not found');
+        return;
+    }
+
+    activeAliasEditUid = uid;
+    const alias = getContactAlias(uid);
+    const profile = allUsersCache?.[uid] || { fullname: 'Unknown User' };
+    input.value = alias || '';
+    if (nameHint) {
+        nameHint.textContent = `Current name: ${profile.fullname || profile.name || 'Unknown User'}`;
+    }
+
+    modal.style.display = 'flex';
+    modal.style.position = 'fixed';
+    modal.style.inset = '0';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.background = 'rgba(0, 0, 0, 0.5)';
+    modal.style.zIndex = '20000';
+    modal.style.pointerEvents = 'auto';
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
+
+    try {
+        console.log('edit alias modal opened');
+        console.log('modal element:', modal);
+        const cs = window.getComputedStyle(modal);
+        console.log('modal computed display:', cs.display, 'visibility:', cs.visibility, 'opacity:', cs.opacity, 'position:', cs.position, 'zIndex:', cs.zIndex);
+        console.log('modal rect:', modal.getBoundingClientRect());
+        console.log('modal in document?', document.contains(modal));
+        console.log('body overflow before open:', document.body.style.overflow);
+    } catch (err) {
+        console.warn('Failed to log modal debug info', err);
+    }
+
+    setTimeout(() => {
+        try {
+            const cs = window.getComputedStyle(modal);
+            console.log('modal computed after paint:', cs.display, cs.visibility, cs.opacity, 'bounds:', modal.getBoundingClientRect());
+        } catch (err) {
+            console.warn('Failed to log modal computed state after paint', err);
+        }
+    }, 0);
+
+    input.focus({ preventScroll: true });
+};
+
+const closeEditContactAliasModal = () => {
+    const modal = document.querySelector('[data-ui="edit-contact-alias-modal"]');
+    if (modal) modal.style.display = 'none';
+    activeAliasEditUid = null;
+};
+
+const saveContactAliasFromModal = () => {
+    const input = document.querySelector('[data-ui="edit-contact-alias-input"]');
+    if (!input || !activeAliasEditUid) return;
+    setContactAlias(activeAliasEditUid, input.value || '');
+    if (activeChatUid === activeAliasEditUid && elements.chatHeaderName) {
+        elements.chatHeaderName.textContent = getContactDisplayName(activeAliasEditUid, allUsersCache?.[activeAliasEditUid] || {});
+    }
+    if (typeof refreshChatSidebars === 'function') refreshChatSidebars();
+    if (typeof updateCustomerSidebar === 'function') updateCustomerSidebar();
+    closeEditContactAliasModal();
+};
+
 const normalizeMessageText = (value) => {
     if (value === null || value === undefined) return '';
     if (typeof value === 'string') return value;
@@ -568,7 +715,7 @@ const setupLightboxUI = (msg, url, isProfilePhoto) => {
         if (elements.lightboxHeader) elements.lightboxHeader.style.display = 'flex';
         if (elements.lightboxUserInfo) elements.lightboxUserInfo.style.display = 'flex';
         const profile = allUsersCache[msg.senderId] || {};
-        const name = profile.fullname || msg.senderName || 'Contact';
+        const name = getContactDisplayName(msg.senderId, profile) || msg.senderName || 'Contact';
 
         if (usernameEl) {
             usernameEl.textContent = name;
@@ -1331,7 +1478,8 @@ const showUserProfileInfo = (uid, profile, showRequestActions = true, profileAct
     const modalTitle = elements.messageInfoModal.querySelector('h3');
     if (modalTitle) modalTitle.textContent = 'User Profile';
 
-    const initials = (profile.fullname || 'U').charAt(0).toUpperCase();
+    const displayName = getContactDisplayName(uid, profile);
+    const initials = (displayName || 'U').charAt(0).toUpperCase();
     const isFriend = !!moduleFriendsList[uid];
     const privacy = profile.profilePhotoPrivacy || 'anyone';
     const isMe = auth.currentUser && uid === auth.currentUser.uid;
@@ -1349,7 +1497,7 @@ const showUserProfileInfo = (uid, profile, showRequestActions = true, profileAct
         ${avatarHtml}
         <div class="message-info-item">
             <span class="message-info-label">Name</span>
-            <span class="message-info-value">${profile.fullname || 'Unknown'}</span>
+            <span class="message-info-value">${displayName || 'Unknown'}</span>
         </div>
         <div class="message-info-item">
             <span class="message-info-label">Phone</span>
@@ -1651,7 +1799,7 @@ const showReactionDetails = (msgId, emoji, allUsers) => {
 
     sortedUserIds.forEach(uid => {
         const userProfile = allUsers[uid];
-        const name = userProfile?.fullname || 'Unknown User';
+        const name = getContactDisplayName(uid, userProfile) || 'Unknown User';
         const avatar = getAvatarUrl(name, userProfile?.profilePhoto);
         const time = new Date(userReactions[uid]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -1903,7 +2051,7 @@ const populateForwardUserList = async () => {
         if (list.length === 0) return;
         container.insertAdjacentHTML('beforeend', `<div class="forward-section-header">${title}</div>`);
         list.forEach(({ uid, profile }) => {
-            const name = profile.fullname || 'User';
+            const name = getContactDisplayName(uid, profile) || 'User';
             const initials = name.charAt(0).toUpperCase();
             const avatarHtml = profile.profilePhoto ? `<img src="${profile.profilePhoto}" class="avatar-img">` : initials;
 
@@ -4029,11 +4177,12 @@ const startCall = async (type) => {
     if (elements.callScreenShareBtn) elements.callScreenShareBtn.style.display = 'none';
 
     if (elements.callOverlay) {
-        elements.callOverlayName.textContent = profileData.fullname;
+        const callName = profileData.isGroup ? (profileData.fullname || 'Group Chat') : getContactDisplayName(activeChatUid, profileData) || profileData.fullname || 'Contact';
+        elements.callOverlayName.textContent = callName;
         if (profileData.profilePhoto && !profileData.profilePhoto.includes('group-info-avatar-img') && !profileData.profilePhoto.endsWith('/')) {
             elements.callOverlayAvatar.innerHTML = `<img src="${profileData.profilePhoto}" class="avatar-img">`;
         } else {
-            elements.callOverlayAvatar.innerHTML = (profileData.fullname || 'G').charAt(0).toUpperCase();
+            elements.callOverlayAvatar.innerHTML = (callName || 'G').charAt(0).toUpperCase();
         }
         elements.callOverlay.style.display = 'flex';
         elements.callStatus.textContent = "Calling...";
@@ -4808,12 +4957,12 @@ const updateCallUI = () => {
 
     const names = [];
     if (currentCallPartnerUid && allUsersCache[currentCallPartnerUid]) {
-        names.push(allUsersCache[currentCallPartnerUid].fullname);
+        names.push(getContactDisplayName(currentCallPartnerUid, allUsersCache[currentCallPartnerUid]));
     }
 
     callParticipants.forEach(uid => {
         if (uid !== currentCallPartnerUid && allUsersCache[uid]) {
-            names.push(allUsersCache[uid].fullname);
+            names.push(getContactDisplayName(uid, allUsersCache[uid]));
         }
     });
 
@@ -4994,7 +5143,7 @@ const showAddParticipantModal = () => {
     } else {
         onlineFriends.forEach(uid => {
             const profile = allUsersCache[uid];
-            const name = profile.fullname || 'Unknown Contact';
+            const name = getContactDisplayName(uid, profile) || 'Unknown Contact';
             const initials = name.charAt(0).toUpperCase();
             const avatarHtml = profile.profilePhoto
                 ? `<img src="${profile.profilePhoto}" class="add-participant-avatar">`
@@ -5269,12 +5418,13 @@ const handleSingleSignal = async (senderUid, signal) => {
 
         const otherNames = groupPartners
             .filter(uid => uid !== user.uid && uid !== senderUid)
-            .map(uid => allUsersCache[uid]?.fullname || 'Contact')
+            .map(uid => getContactDisplayName(uid, allUsersCache[uid]) || 'Contact')
             .join(', ');
 
-        const inviteText = otherNames ? `Group call with ${signal.fromName} and ${otherNames}` : `Group call with ${signal.fromName}`;
+        const senderName = getContactDisplayName(senderUid, allUsersCache[senderUid]) || signal.fromName || 'Contact';
+        const inviteText = otherNames ? `Group call with ${senderName} and ${otherNames}` : `Group call with ${senderName}`;
 
-        elements.incomingName.textContent = signal.fromName;
+        elements.incomingName.textContent = senderName;
         elements.incomingCallOverlay.querySelector('p').textContent = inviteText;
         elements.incomingCallOverlay.style.display = 'flex';
         if (elements.incomingAvatar) {
@@ -5419,7 +5569,7 @@ const handleSingleSignal = async (senderUid, signal) => {
             console.warn("Failed to save busy call log:", err);
         }
         callLoggingSession = null;
-        showToast(`${allUsersCache[senderUid]?.fullname || 'Contact'} is busy`, "warning");
+        showToast(`${getContactDisplayName(senderUid, allUsersCache[senderUid]) || 'Contact'} is busy`, "warning");
         closePeerConnection(senderUid);
         updateCallUI();
     } else if (signal.status === 'ringing') {
@@ -5504,12 +5654,13 @@ const initCallHistory = (user) => {
             container.innerHTML = '';
             logArray.forEach(log => {
                 const contact = allUsers[log.contactUid] || { fullname: 'Unknown', profilePhoto: '' };
+                const contactName = getContactDisplayName(log.contactUid, contact) || 'Unknown';
                 const date = new Date(log.timestamp), timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
                 let icon = '', statusText = '', colorClass = '', callTypeIcon = log.callType === 'video' ? 'fa-video' : 'fa-phone';
                 if (log.type === 'outgoing') { icon = `<i class="fa-solid ${callTypeIcon} call-type-icon outgoing"></i>`; statusText = log.status === 'completed' ? `Outgoing (${formatDuration(log.duration)})` : (log.status === 'missed' || log.status === 'cancelled' ? 'Canceled' : (log.status === 'declined' ? 'Declined' : log.status.charAt(0).toUpperCase() + log.status.slice(1))); colorClass = log.status === 'missed' ? 'missed' : ''; }
                 else { if (log.status === 'missed' || log.status === 'busy') { icon = `<i class="fa-solid ${log.callType === 'video' ? 'fa-video-slash' : 'fa-phone-slash'} call-type-icon missed"></i>`; statusText = log.status === 'missed' ? 'Missed' : 'Missed (Busy)'; colorClass = 'missed'; } else { icon = `<i class="fa-solid ${callTypeIcon} call-type-icon incoming"></i>`; statusText = log.status === 'completed' ? `Incoming (${formatDuration(log.duration)})` : (log.status === 'declined' ? 'Declined' : 'Incoming'); } }
-                const avatarHtml = contact.profilePhoto ? `<img src="${contact.profilePhoto}" class="avatar-img">` : (contact.fullname || 'U').charAt(0).toUpperCase();
-                const html = `<div class="conversation-item call-history-item" data-uid="${log.contactUid}"><div class="conversation-avatar">${avatarHtml}</div><div class="conversation-info"><div class="conversation-header"><div class="conversation-name ${colorClass}" data-name="${contact.fullname}">${contact.fullname}</div><div class="conversation-time">${dateStr}, ${timeStr}</div></div><div class="conversation-preview">${icon} ${statusText}</div></div><button class="redial-btn" data-uid="${log.contactUid}" data-type="${log.callType}" title="Redial"><i class="fa-solid ${log.callType === 'video' ? 'fa-video' : 'fa-phone'}"></i></button></div>`;
+                const avatarHtml = contact.profilePhoto ? `<img src="${contact.profilePhoto}" class="avatar-img">` : (contactName.charAt(0).toUpperCase());
+                const html = `<div class="conversation-item call-history-item" data-uid="${log.contactUid}"><div class="conversation-avatar">${avatarHtml}</div><div class="conversation-info"><div class="conversation-header"><div class="conversation-name ${colorClass}" data-name="${contactName}">${contactName}</div><div class="conversation-time">${dateStr}, ${timeStr}</div></div><div class="conversation-preview">${icon} ${statusText}</div></div><button class="redial-btn" data-uid="${log.contactUid}" data-type="${log.callType}" title="Redial"><i class="fa-solid ${log.callType === 'video' ? 'fa-video' : 'fa-phone'}"></i></button></div>`;
                 container.insertAdjacentHTML('beforeend', html);
             });
             const searchInput = elements.callsSidebar?.querySelector('.search-input');
@@ -6102,10 +6253,9 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
 
                 if (msg.targetUserId || msg.senderId) {
                     const senderProfile = allUsersCache[msg.senderId];
-                    const senderName = senderProfile ? (msg.senderId === auth.currentUser?.uid ? 'You' : senderProfile.fullname) : 'Someone';
-                    const targetProfile = msg.targetUserId ? allUsersCache[msg.targetUserId] : null;
-                    const targetName = targetProfile ? (msg.targetUserId === auth.currentUser?.uid ? 'you' : targetProfile.fullname) : 'someone';
-
+        const senderName = senderProfile ? (msg.senderId === auth.currentUser?.uid ? 'You' : getContactDisplayName(msg.senderId, senderProfile)) : 'Someone';
+        const targetProfile = msg.targetUserId ? allUsersCache[msg.targetUserId] : null;
+        const targetName = targetProfile ? (msg.targetUserId === auth.currentUser?.uid ? 'you' : getContactDisplayName(msg.targetUserId, targetProfile)) : 'someone';
                     if (msg.text === 'made admin') {
                         displayText = `${senderName} made ${targetName} a group admin`;
                     } else if (msg.text === 'dismissed as admin') {
@@ -6492,16 +6642,17 @@ const startMessageListener = async (otherUid) => {
                 // Condition 1: Other user's privacy
                 else if (!isAllowedByPrivacy(otherUserWhoCanMessage, isFriend, isUserExcluded(profile.excludedContacts, auth.currentUser.uid))) {
                     chatBlocked = true;
-                    if (otherUserWhoCanMessage === 'friends-only') {
-                        blockReason = `${profile.fullname} only accepts messages from friends.`;
+                    const profileDisplayName = getContactDisplayName(otherUid, profile);
+                if (otherUserWhoCanMessage === 'friends-only') {
+                        blockReason = `${profileDisplayName} only accepts messages from friends.`;
                     } else if (otherUserWhoCanMessage === 'excluded') {
                         if (!isFriend) {
-                            blockReason = `${profile.fullname} only accepts messages from approved contacts.`;
+                            blockReason = `${profileDisplayName} only accepts messages from approved contacts.`;
                         } else {
                             blockReason = `You cannot message this user because they have restricted access for this contact.`;
                         }
                     } else {
-                        blockReason = `${profile.fullname} does not accept new messages.`;
+                        blockReason = `${profileDisplayName} does not accept new messages.`;
                     }
                 }
                 // Condition 2: Current user's privacy
@@ -6568,17 +6719,8 @@ const startMessageListener = async (otherUid) => {
                         const existingLock = elements.chatHeaderName.parentNode.querySelector('.e2ee-header-lock');
                         if (existingLock) existingLock.remove();
 
-                        elements.chatHeaderName.textContent = profile.fullname;
-                        elements.chatHeaderName.insertAdjacentHTML('afterend', lockIcon);
+                        elements.chatHeaderName.textContent = getContactDisplayName(otherUid, profile);
                     }
-
-                    // Render E2EE notice bubble at the top of the chat
-                    renderE2EENotice(!!(profile.publicKey));
-
-                    if (profile.publicKey) {
-                        decryptPendingMessages();
-                    }
-
                     if (elements.chatHeaderAvatar) {
                         const initials = (profile.fullname || 'U').charAt(0).toUpperCase();
                         const dot = elements.chatHeaderAvatar.querySelector('.online-dot');
@@ -7491,8 +7633,8 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
         .filter(([, profile]) => !!profile) // Ensure profile is not null/undefined
         .sort(([, a], [, b]) => {
             if (container.getAttribute('data-ui') === 'cust-conversation-list') {
-                const nameA = (a.fullname || '').trim().toLowerCase();
-                const nameB = (b.fullname || '').trim().toLowerCase();
+                const nameA = getContactDisplayName(a.uid || a.userId || '', a).trim().toLowerCase();
+                const nameB = getContactDisplayName(b.uid || b.userId || '', b).trim().toLowerCase();
                 return nameA.localeCompare(nameB);
             }
             const timeA = isRecentSidebar ? (a.lastInteraction || 0) : (a.lastSeen || 0);
@@ -7501,7 +7643,8 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
         });
 
     sortedUsers.forEach(([uid, profile]) => {
-        const name = profile.fullname || 'Unknown User';
+        const displayName = getContactDisplayName(uid, profile);
+        const name = displayName || 'Unknown User';
         const initials = name.charAt(0).toUpperCase();
         const timeSummary = profile.isGroup
             ? (profile.lastInteraction ? getRelativeTime(profile.lastInteraction) : '')
@@ -7514,6 +7657,10 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
         const canSeeOnline = !profile.isGroup && shouldShowOnline(profile, uid);
         const isOrderLast = !profile.isGroup && ((profile.lastMessageType === 'document' && profile.lastMessageFileName && profile.lastMessageFileName.startsWith('Invoice_')) || profile.lastMessageType === 'invoice') && profile.lastSenderId === uid;
 
+        const showEditButton = container.getAttribute('data-ui') === 'cust-conversation-list' && !profile.isGroup && uid !== currentUserId;
+        const editButtonHtml = showEditButton
+            ? `<button class="edit-contact-name-btn" type="button" data-uid="${uid}" title="Edit display name" style="position:static;margin-left:6px;border:none;background:var(--brand);color:white;cursor:pointer;padding:6px;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.85rem;box-shadow:0 1px 2px rgba(0,0,0,0.12);z-index:2;pointer-events:auto;"> <i class="fa-solid fa-pen" style="color:white;font-size:0.9rem;"></i></button>`
+            : '';
         const html = `
             <div class="conversation-item ${canSeeOnline ? 'online' : ''} ${uid === activeChatUid ? 'active' : ''}" data-uid="${uid}" data-ui="conversation-item">
                 <div class="conversation-avatar" style="position: relative;">
@@ -7522,9 +7669,12 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
                     <div class="order-notif-badge" style="display: ${isOrderLast ? 'flex' : 'none'}; position: absolute; top: -4px; left: -4px; background: #ff9800; color: white; border-radius: 50%; width: 18px; height: 18px; align-items: center; justify-content: center; border: 1.5px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 5; font-size: 0.65rem;" title="Order Received">📦</div>
                 </div>
                 <div class="conversation-info">
-                    <div class="conversation-header">
-                        <div class="conversation-name" data-name="${name}">${name}${mutedIconHtml}</div>
-                        <div class="conversation-time">${timeSummary}</div>
+                    <div class="conversation-header" style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                            <div class="conversation-name" data-name="${name}" style="min-width:0; overflow:hidden; text-overflow:ellipsis;">${name}${mutedIconHtml}</div>
+                            ${editButtonHtml}
+                        </div>
+                        <div class="conversation-time" style="flex-shrink:0; white-space:nowrap; margin-left:8px;">${timeSummary}</div>
                     </div>
                     <div class="conversation-preview">${previewText}</div>
                 </div>
@@ -7534,6 +7684,30 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
         container.insertAdjacentHTML('beforeend', html);
 
         const conversationItem = container.lastElementChild;
+        // Ensure edit button responds even if delegation fails; attach direct listener
+        try {
+            const editBtnEl = conversationItem.querySelector('.edit-contact-name-btn');
+            if (editBtnEl) {
+                editBtnEl.style.pointerEvents = 'auto';
+                // add debug log to help diagnose click issues
+                // Prevent parent handlers from triggering on pointer/mousedown as well
+                const stopEvt = (ev) => { try { ev.stopPropagation(); } catch (e) {} };
+                editBtnEl.addEventListener('pointerdown', stopEvt);
+                editBtnEl.addEventListener('mousedown', stopEvt);
+                editBtnEl.addEventListener('touchstart', stopEvt);
+                editBtnEl.addEventListener('click', (ev) => {
+                    console.debug('edit-contact-name-btn clicked for uid:', editBtnEl.dataset.uid);
+                    ev.stopPropagation();
+                    const uid = editBtnEl.dataset.uid;
+                    if (uid) {
+                        openEditContactAliasModal(uid);
+                        console.debug('openEditContactAliasModal invoked for', uid);
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn('Failed to attach direct edit button listener', err);
+        }
         const previewEl = conversationItem.querySelector('.conversation-preview');
         const timeEl = conversationItem.querySelector('.conversation-time');
 
@@ -7599,7 +7773,8 @@ export const renderUserList = (users, container, currentUserId, isRecentSidebar 
                 }
                 if (nameEl) {
                     const isMuted = !!mutedUsers[uid];
-                    nameEl.innerHTML = `${merged.fullname}<i class="fa-solid fa-bell-slash muted-icon" title="Notifications Silenced" style="display: ${isMuted ? 'inline-block' : 'none'};"></i>`;
+                    const displayName = getContactDisplayName(uid, merged);
+                    nameEl.innerHTML = `${displayName}<i class="fa-solid fa-bell-slash muted-icon" title="Notifications Silenced" style="display: ${isMuted ? 'inline-block' : 'none'};"></i>`;
                 }
             });
         }
@@ -7817,7 +7992,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
                 // For finding new people or searching added ones, require an active search term
                 if (!term) return false;
 
-                const name = (profile.fullname || '').toLowerCase();
+                const name = getContactDisplayName(uid, profile).toLowerCase();
                 const email = (profile.email || '').toLowerCase();
                 const phone = (profile.phoneNumber || '').toLowerCase();
                 const matchesSearch = name.includes(term) || email.includes(term) || phone.includes(term) || uid.toLowerCase().includes(term);
@@ -7886,6 +8061,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
             </div>`;
 
             const isMobileCompactLayout = window.matchMedia('(max-width: 768px)').matches && (activeManageTab === 'new' || activeManageTab === 'requests');
+            const displayName = getContactDisplayName(uid, profile) || 'Unknown User';
             const html = isMobileCompactLayout
                 ? `
                     <div class="manage-customer-mobile-card ${!isCustomer && wasCustomer ? 'is-removed' : ''}" data-uid="${uid}">
@@ -7893,7 +8069,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
                             <div class="conversation-avatar">${getAvatarHtml(profile, uid)}</div>
                         </button>
                         <div class="manage-customer-mobile-meta">
-                            <div class="conversation-name">${profile.fullname || 'Unknown User'}</div>
+                            <div class="conversation-name">${displayName}</div>
                             <div class="conversation-preview">${previewSubtitle}</div>
                         </div>
                         <div class="manage-customer-mobile-actions">${btnHtml}</div>
@@ -7903,7 +8079,7 @@ const handleManageCustomers = async (requestFilter = activeRequestFilter) => {
                         <div class="conversation-avatar">${getAvatarHtml(profile, uid)}</div>
                         <div class="conversation-info" style="display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; cursor:pointer;" data-uid="${uid}" data-action="open-profile">
                             <div class="conversation-name" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                                <span>${profile.fullname || 'Unknown User'}</span>
+                                <span>${displayName}</span>
                                 ${activeManageTab === 'requests' ? '<span style="font-size:0.72rem;color:var(--brand);font-weight:700;">Profile</span>' : ''}
                             </div>
                             ${previewMeta}
@@ -8794,6 +8970,28 @@ export const initChatSelection = () => {
                     if (profileData) showUserProfileInfo(uid, profileData, false);
                 });
             }
+            return;
+        }
+
+        const editAliasBtn = e.target.closest('.edit-contact-name-btn');
+        if (editAliasBtn) {
+            e.stopPropagation();
+            const uid = editAliasBtn.dataset.uid;
+            if (uid) openEditContactAliasModal(uid);
+            return;
+        }
+
+        const editAliasSaveBtn = e.target.closest('[data-ui="edit-contact-alias-save-btn"]');
+        if (editAliasSaveBtn) {
+            e.stopPropagation();
+            saveContactAliasFromModal();
+            return;
+        }
+
+        const editAliasCancelBtn = e.target.closest('[data-ui="close-edit-contact-alias-modal"], [data-ui="edit-contact-alias-cancel-btn"]');
+        if (editAliasCancelBtn) {
+            e.stopPropagation();
+            closeEditContactAliasModal();
             return;
         }
 
@@ -11191,7 +11389,7 @@ export const initChatSelection = () => {
             if (elements.groupInfoMeta) {
                 console.log("Fetching creator profile for:", groupData.createdBy);
                 const creatorProfile = allUsersCache[groupData.createdBy] || await getUserProfile(groupData.createdBy);
-                const creatorName = creatorProfile ? creatorProfile.fullname : 'Unknown';
+                const creatorName = creatorProfile ? getContactDisplayName(groupData.createdBy, creatorProfile) : 'Unknown';
                 const createdDate = groupData.createdAt ? new Date(groupData.createdAt).toLocaleDateString() : '';
                 elements.groupInfoMeta.textContent = `Created by ${creatorName} on ${createdDate}`;
             }
@@ -11214,7 +11412,8 @@ export const initChatSelection = () => {
 
                     const isMemberAdmin = (groupData.admins && groupData.admins[memberId]) || (groupData.createdBy === memberId);
                     const isMe = memberId === currentUser.uid;
-                    const nameText = isMe ? `${profile.fullname} (You)` : profile.fullname;
+                    const memberDisplayName = getContactDisplayName(memberId, profile) || profile.fullname || 'Unknown';
+                    const nameText = isMe ? `${memberDisplayName} (You)` : memberDisplayName;
 
                     const row = document.createElement('div');
                     row.className = 'settings-menu-item';
@@ -11241,7 +11440,7 @@ export const initChatSelection = () => {
                             selectedMemberIdForAction = memberId;
                             if (elements.participantActionsModal) {
                                 const title = document.getElementById('participant-actions-title');
-                                if (title) title.textContent = profile.fullname;
+                                if (title) title.textContent = getContactDisplayName(memberId, profile) || profile.fullname || 'Unknown';
 
                                 if (elements.actionMakeAdminBtn) {
                                     elements.actionMakeAdminBtn.style.display = isCurrentUserAdmin ? 'block' : 'none';
@@ -11251,7 +11450,7 @@ export const initChatSelection = () => {
                                     elements.actionRemoveMemberBtn.style.display = isCurrentUserAdmin ? 'block' : 'none';
                                 }
                                 if (elements.actionMessageMemberBtn) {
-                                    elements.actionMessageMemberBtn.textContent = `Message ${profile.fullname}`;
+                                    elements.actionMessageMemberBtn.textContent = `Message ${getContactDisplayName(memberId, profile) || profile.fullname || 'User'}`;
                                 }
                                 elements.participantActionsModal.style.display = 'flex';
                             }
@@ -11839,7 +12038,7 @@ export const initChatSelection = () => {
         const filteredBlockedUsers = blockedUserIds.filter(uid => {
             const profile = allUsersCache[uid];
             if (!profile) return false;
-            const name = (profile.fullname || '').toLowerCase();
+            const name = (getContactDisplayName(uid, profile) || '').toLowerCase();
             const email = (profile.email || '').toLowerCase();
             const phone = (profile.phoneNumber || '').toLowerCase();
             return name.includes(term) || email.includes(term) || phone.includes(term) || uid.toLowerCase().includes(term);
@@ -11852,7 +12051,7 @@ export const initChatSelection = () => {
 
         filteredBlockedUsers.forEach(uid => {
             const profile = allUsersCache[uid];
-            const name = profile?.fullname || 'Unknown User';
+            const name = getContactDisplayName(uid, profile) || 'Unknown User';
             const avatarHtml = profile?.profilePhoto ? `<img src="${profile.profilePhoto}" class="avatar-img">` : (name.charAt(0).toUpperCase());
             const blockReason = blockedUsers[uid]?.reason || 'Other';
 
@@ -12117,7 +12316,7 @@ export const initChatSelection = () => {
 
         filteredFriends.forEach(uid => {
             const profile = allUsersCache[uid];
-            const name = profile?.fullname || 'Unknown User';
+            const name = getContactDisplayName(uid, profile) || 'Unknown User';
             const avatarHtml = profile?.profilePhoto ? `<img src="${profile.profilePhoto}" class="avatar-img">` : (name.charAt(0).toUpperCase());
             const isExcluded = !!excludedContacts[uid];
 
