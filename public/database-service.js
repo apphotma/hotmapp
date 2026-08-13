@@ -352,12 +352,19 @@ export const addGroupMembers = async (groupId, memberIds, addedById) => {
     if (!groupSnapshot.exists()) return;
     const groupData = groupSnapshot.val();
 
-    const updates = {};
     const timestamp = serverTimestamp();
 
+    // 1. Add members to the group path first so that security rules check for membership passes
+    const memberUpdates = {};
     memberIds.forEach(memberId => {
-        updates[`groups/${groupId}/members/${memberId}`] = true;
-        updates[`users/${memberId}/chatList/${groupId}`] = {
+        memberUpdates[`groups/${groupId}/members/${memberId}`] = true;
+    });
+    await update(ref(db), memberUpdates);
+
+    // 2. Write group reference to each added member's chatList node
+    const chatListUpdates = {};
+    memberIds.forEach(memberId => {
+        chatListUpdates[`users/${memberId}/chatList/${groupId}`] = {
             lastInteraction: timestamp,
             lastMessage: "Added to group",
             lastSenderId: addedById,
@@ -367,8 +374,7 @@ export const addGroupMembers = async (groupId, memberIds, addedById) => {
             messageCount: 0
         };
     });
-
-    await update(ref(db), updates);
+    await update(ref(db), chatListUpdates);
 
     for (const memberId of memberIds) {
         await saveMessage(groupId, {
@@ -384,9 +390,9 @@ export const addGroupMembers = async (groupId, memberIds, addedById) => {
  * Removes a member from the group
  */
 export const removeGroupMember = async (groupId, memberId, removedById) => {
+    await set(ref(db, `users/${memberId}/chatList/${groupId}`), null);
     await set(ref(db, `groups/${groupId}/members/${memberId}`), null);
     await set(ref(db, `groups/${groupId}/admins/${memberId}`), null);
-    await set(ref(db, `users/${memberId}/chatList/${groupId}`), null);
 
     await saveMessage(groupId, {
         senderId: removedById,

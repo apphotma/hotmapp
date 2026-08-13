@@ -981,6 +981,8 @@ let isProcessingQueue = false;
 let olderMessagesBacklog = [];
 let pendingMessageSyncInFlight = false;
 let pendingMessageSyncListenerAttached = false;
+let pendingMediaUploadsQueue = [];
+let pendingMediaSyncInFlight = false;
 let isLoadingOlderMessages = false;
 let renderedCount = 0;
 let backgroundDecryptPaused = false;
@@ -1507,6 +1509,14 @@ const showUserProfileInfo = (uid, profile, showRequestActions = true, profileAct
         html += `
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="customer-toggle-btn unfriend-btn" data-uid="${uid}" style="flex: 1; background: #ff4d4d;">Unfriend</button>
+            </div>
+        `;
+    } else if (!isMe) {
+        html += `
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="customer-toggle-btn ${hasPendingRequest ? 'cancel-profile-request-btn' : 'send-profile-request-btn'}" data-uid="${uid}" style="flex: 1; background: ${hasPendingRequest ? '#ff4d4d' : 'var(--brand)'}; color: white;">
+                    ${hasPendingRequest ? 'Cancel Request' : 'Send Request'}
+                </button>
             </div>
         `;
     }
@@ -2580,6 +2590,86 @@ const hideReplyPreview = () => {
     if (elements.replyPreview) elements.replyPreview.style.display = 'none';
 };
 
+const processMediaUpload = async (item) => {
+    const { id, fileOrBlob, type, fileName, chatId, clientTimestamp, replyingTo, uploadTarget, videoDuration, previewUrl } = item;
+    
+    let thumbnailUrl = null;
+    if (type === 'document' && fileName?.toLowerCase().endsWith('.pdf')) {
+        try {
+            const thumbBlob = await generatePdfThumbnail(fileOrBlob);
+            const thumbPath = `chat_media/${chatId}/thumb_${Date.now()}.jpg`;
+            thumbnailUrl = await uploadFile(thumbPath, thumbBlob);
+        } catch (e) {
+            console.warn("Could not generate PDF thumbnail", e);
+        }
+    }
+
+    try {
+        const extension = fileName ? fileName.split('.').pop() : (type === 'image' ? 'jpg' : 'bin');
+        const storagePath = `chat_media/${chatId}/${Date.now()}_${auth.currentUser.uid}.${extension}`;
+
+        const uploadTask = uploadFile(storagePath, uploadTarget, (progress) => {
+            try {
+                const msgEl = document.getElementById(id);
+                if (msgEl) {
+                    const progressText = msgEl.querySelector('.inline-progress-text');
+                    if (progressText) progressText.textContent = `${Math.round(progress)}%`;
+                    const docProgressText = msgEl.querySelector('.class-doc-progress');
+                    if (docProgressText) docProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+                    const audioProgressText = msgEl.querySelector('.class-audio-progress');
+                    if (audioProgressText) audioProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+                }
+            } catch (e) { }
+        });
+
+        const downloadURL = await uploadTask;
+
+        // Update optimistic placeholder immediately with the real URL
+        try {
+            const updatedLocal = {
+                id,
+                senderId: auth.currentUser.uid,
+                chatId: chatId,
+                type: type,
+                url: downloadURL,
+                thumbnailUrl: thumbnailUrl || (type === 'image' ? downloadURL : null),
+                fileName: fileName || `media_${Date.now()}`,
+                timestamp: clientTimestamp,
+                status: 'sending',
+                fileSize: fileOrBlob.size
+            };
+            displayMessage(updatedLocal, false);
+        } catch (e) { console.warn('Failed to update placeholder with URL', e); }
+
+        // Save metadata and downloadURL to DB
+        const messageData = {
+            senderId: auth.currentUser.uid,
+            chatId: chatId,
+            type: type,
+            url: downloadURL,
+            fileName: fileName || `media_${Date.now()}`,
+            timestamp: clientTimestamp,
+            thumbnailUrl: thumbnailUrl,
+            replyTo: replyingTo,
+            fileSize: fileOrBlob.size,
+            status: chatId.startsWith('group_') ? 'notified' : 'sent'
+        };
+        if (videoDuration) messageData.duration = videoDuration;
+
+        await saveMessage(chatId, messageData, id);
+    } catch (error) {
+        console.error("Media Upload Error:", error);
+        showToast("Failed to upload media. Please try again.", "error");
+        try {
+            displayMessage({ id, senderId: auth.currentUser.uid, status: 'failed' }, false);
+            const msgEl = document.getElementById(id);
+            if (msgEl) msgEl.classList.add('message-send-failed');
+        } catch (e) { }
+    } finally {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+    }
+};
+
 const sendMedia = async (type, fileOrBlob, fileName = null) => {
     const user = auth.currentUser;
     if (!user || !activeChatUid || !fileOrBlob || !elements.chatArea) return;
@@ -2621,23 +2711,7 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
 
     const previewUrl = type === 'image' ? URL.createObjectURL(uploadTarget) : null;
     const displayName = fileName || (type.charAt(0).toUpperCase() + type.slice(1));
-    const fileIcon = type === 'document' ? getFileIcon(fileName) : (type === 'audio' ? '🎵' : (type === 'video' ? '🎬' : ''));
-
-    // Create upload progress UI (floating) and an optimistic message placeholder
-    const progressContainer = document.createElement('div');
-    progressContainer.className = 'upload-progress-container';
-    progressContainer.innerHTML = `
-        ${previewUrl ? `<img src="${previewUrl}" class="upload-preview-img">` : ''}
-        ${fileIcon ? `<div class="upload-file-icon">${fileIcon}</div>` : ''}
-        <div class="progress-text" title="${displayName}">Preparing: ${displayName}</div>
-        <div class="progress-bar"><div class="progress-bar-fill"></div></div>
-        <button class="upload-cancel-btn">Cancel Upload</button>
-    `;
-    elements.chatArea.appendChild(progressContainer);
-
-    // Prepare reply/thumbnail variables before creating optimistic UI
     const replyData = replyingTo ? { ...replyingTo } : null;
-    let thumbnailUrl = null;
 
     // Optimistic UI: create a local placeholder message so media appears immediately
     const placeholderMessage = {
@@ -2646,7 +2720,7 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
         chatId: chatId,
         type: type,
         url: previewUrl || null,
-        thumbnailUrl: (type === 'image' ? previewUrl : thumbnailUrl) || null,
+        thumbnailUrl: previewUrl || null,
         fileName: fileName || displayName,
         timestamp: clientTimestamp,
         status: 'sending',
@@ -2658,113 +2732,33 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
     // Immediately render the placeholder in the messages container
     try {
         displayMessage(placeholderMessage, false);
-        // Insert a small progress bar inside the message bubble so it's visible inline
-        const inserted = document.getElementById(preGeneratedId);
-        if (inserted) {
-            const bubble = inserted.querySelector('.message-bubble');
-            if (bubble) {
-                const inlineProgress = document.createElement('div');
-                inlineProgress.className = 'message-upload-inline-progress';
-                inlineProgress.innerHTML = `<div class="inline-progress-fill" style="width:0%"></div>`;
-                bubble.appendChild(inlineProgress);
-            }
-        }
     } catch (e) {
         console.warn('Could not render optimistic placeholder message', e);
     }
 
+    const item = {
+        id: preGeneratedId,
+        fileOrBlob,
+        type,
+        fileName,
+        chatId,
+        clientTimestamp,
+        replyingTo: replyData,
+        uploadTarget,
+        videoDuration,
+        previewUrl
+    };
 
-    if (type === 'document' && fileName?.toLowerCase().endsWith('.pdf')) {
-        try {
-            const thumbBlob = await generatePdfThumbnail(fileOrBlob);
-            const thumbPath = `chat_media/${chatId}/thumb_${Date.now()}.jpg`;
-            thumbnailUrl = await uploadFile(thumbPath, thumbBlob);
-        } catch (e) {
-            console.warn("Could not generate PDF thumbnail", e);
-        }
-    }
-
-    try {
-        // 1. Upload to Firebase Storage first
-        const extension = fileName ? fileName.split('.').pop() : (type === 'image' ? 'jpg' : 'bin');
-        const storagePath = `chat_media/${chatId}/${Date.now()}_${user.uid}.${extension}`;
-
-        const uploadTask = uploadFile(storagePath, uploadTarget, (progress) => {
-            const fill = progressContainer.querySelector('.progress-bar-fill');
-            const text = progressContainer.querySelector('.progress-text');
-            if (fill) fill.style.width = `${progress}%`;
-            if (text) text.textContent = `${displayName} (${Math.round(progress)}%)`;
-
-            // Update inline progress inside the optimistic message bubble
-            try {
-                const msgEl = document.getElementById(preGeneratedId);
-                if (msgEl) {
-                    const inlineFill = msgEl.querySelector('.inline-progress-fill');
-                    if (inlineFill) inlineFill.style.width = `${progress}%`;
-                }
-            } catch (e) { /* ignore DOM timing issues */ }
+    if (!(await isOnline())) {
+        pendingMediaUploadsQueue.push(item);
+        showToast('You are offline. Media queued and will send when you are back online.', 'info');
+    } else {
+        processMediaUpload(item).catch(err => {
+            console.error("Error processing media upload:", err);
         });
-
-        const cancelBtn = progressContainer.querySelector('.upload-cancel-btn');
-        if (cancelBtn) cancelBtn.onclick = () => uploadTask.cancel();
-
-        const downloadURL = await uploadTask;
-
-        // Update optimistic placeholder immediately with the real URL so sender sees media
-        try {
-            const updatedLocal = {
-                id: preGeneratedId,
-                senderId: user.uid,
-                chatId: chatId,
-                type: type,
-                url: downloadURL,
-                thumbnailUrl: thumbnailUrl || (type === 'image' ? downloadURL : null),
-                fileName: fileName || `media_${Date.now()}`,
-                timestamp: clientTimestamp,
-                status: 'sending',
-                fileSize: fileOrBlob.size
-            };
-            displayMessage(updatedLocal, false);
-        } catch (e) { console.warn('Failed to update placeholder with URL', e); }
-
-        // 2. Save the metadata and downloadURL to Realtime Database
-        const messageData = {
-            senderId: user.uid,
-            chatId: chatId,
-            type: type,
-            url: downloadURL,
-            fileName: fileName || `media_${Date.now()}`,
-            timestamp: clientTimestamp,
-            thumbnailUrl: thumbnailUrl,
-            replyTo: replyData,
-            fileSize: fileOrBlob.size, // Add file size for document previews
-            status: chatId.startsWith('group_') ? 'notified' : 'sent'
-        };
-        if (videoDuration) messageData.duration = videoDuration;
-
-
-
-        await saveMessage(chatId, messageData, preGeneratedId);
-        hideReplyPreview();
-    } catch (error) {
-        if (error && error.code === 'storage/canceled') {
-            showToast("Upload canceled", "info");
-        } else {
-            console.error("Media Upload Error:", error);
-            showToast("Failed to upload media. Please try again.", "error");
-        }
-        // Mark optimistic message as failed so user sees a retry state
-        try {
-            displayMessage({ id: preGeneratedId, senderId: user.uid, status: 'failed' }, false);
-            const msgEl = document.getElementById(preGeneratedId);
-            if (msgEl) msgEl.classList.add('message-send-failed');
-        } catch (e) { /* ignore updates */ }
-    } finally {
-        if (progressContainer) progressContainer.remove();
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
     }
 
-    // The UI will be updated automatically via the Firebase listener
+    hideReplyPreview();
     if (elements.messagesContainer) elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
 };
 
@@ -5879,7 +5873,20 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
             case 'audio':
                 const photoUrl = (senderProfile && senderProfile.profilePhoto) ? senderProfile.profilePhoto : '';
                 const fallbackImg = photoUrl ? `<img src="${photoUrl}" class="wa-player-avatar" onerror="this.onerror=null; this.src='/hotmapp-logo.png';">` : `<div class="wa-player-avatar-fallback"><i class="fa-solid fa-user"></i></div>`;
-                contentHtml = `
+                const isAudioSending = msg.status === 'sending';
+                contentHtml = isAudioSending ? `
+                    <div class="wa-audio-player wa-audio-uploading" style="display:flex; align-items:center; gap:10px; min-width: 200px;">
+                        <div class="wa-player-avatar-container">
+                            ${fallbackImg}
+                            <span class="wa-player-mic-badge"><i class="fa-solid fa-microphone"></i></span>
+                        </div>
+                        <div class="wa-player-center" style="flex:1;">
+                            <div class="document-name" style="font-size: 0.85rem; font-weight: 500;">Voice Note</div>
+                            <div class="document-meta class-audio-progress" style="font-size: 0.75rem; color: var(--muted);">Uploading: 0%</div>
+                        </div>
+                        <div class="spinner inline-media-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(0, 0, 0, 0.1); border-top-color: var(--brand-dark); border-radius: 50%; animation: spin 1s linear infinite; margin-left: auto;"></div>
+                    </div>
+                ` : `
                     <div class="wa-audio-player">
                         <div class="wa-player-left">
                             <div class="wa-player-avatar-container">
@@ -5900,20 +5907,38 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 break;
             case 'image':
                 const displayUrl = msg.thumbnailUrl || msg.url;
+                const isImgSending = msg.status === 'sending';
                 contentHtml = `
-                    <div class="image-loader-wrapper" style="max-width: 330px; cursor: pointer;">
-                        <div class="spinner"></div>
-                        <img src="${displayUrl}" data-full-url="${msg.url}" class="message-image" alt="Image" draggable="false" onload="this.classList.add('loaded'); this.previousElementSibling.style.display='none';" onerror="this.classList.add('error'); this.previousElementSibling.style.display='none';">
+                    <div class="image-loader-wrapper ${isImgSending ? 'uploading' : ''}" style="max-width: 330px; cursor: pointer; position: relative;">
+                        ${isImgSending ? `
+                            <div class="media-upload-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 2; border-radius: 8px;">
+                                <div class="media-upload-spinner-container" style="position: relative; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); border-radius: 50%;">
+                                    <div class="spinner inline-media-spinner" style="width: 24px; height: 24px; border: 3px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0;"></div>
+                                    <div class="inline-progress-text" style="position: absolute; font-size: 0.65rem; color: #fff; font-weight: bold; pointer-events: none;">0%</div>
+                                </div>
+                            </div>
+                        ` : '<div class="spinner"></div>'}
+                        <img src="${displayUrl}" data-full-url="${msg.url}" class="message-image" alt="Image" draggable="false" onload="this.classList.add('loaded'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';" onerror="this.classList.add('error'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';">
                     </div>
                 `;
                 break;
             case 'video':
                 const videoDisplayUrl = msg.thumbnailUrl || '';
                 durationStr = msg.duration ? formatDuration(Math.round(msg.duration)) : '';
+                const isVideoSending = msg.status === 'sending';
                 contentHtml = `
                     <div class="video-loader-placeholder" data-full-url="${msg.url}" style="position: relative; max-width: 330px; cursor: pointer; border-radius: 8px; overflow: hidden;">
                         ${videoDisplayUrl ? `<img src="${videoDisplayUrl}" class="video-thumb" style="width: 100%; display: block; filter: brightness(0.7);">` : `<div style="width: 180px; height: 120px; background: #262626; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-video" style="font-size: 2rem;"></i></div>`}
-                        <div class="video-play-btn" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;"><i class="fa-solid fa-play"></i></div>
+                        ${isVideoSending ? `
+                            <div class="media-upload-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 2;">
+                                <div class="media-upload-spinner-container" style="position: relative; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); border-radius: 50%;">
+                                    <div class="spinner inline-media-spinner" style="width: 24px; height: 24px; border: 3px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0;"></div>
+                                    <div class="inline-progress-text" style="position: absolute; font-size: 0.65rem; color: #fff; font-weight: bold; pointer-events: none;">0%</div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="video-play-btn" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;"><i class="fa-solid fa-play"></i></div>
+                        `}
                         ${durationStr ? `<div class="video-duration-badge">${durationStr}</div>` : ''}
                     </div>
                 `;
@@ -5949,8 +5974,9 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                     setTimeout(() => window.loadAndRenderInvoiceCard(msg.id, msg.invoiceId, isSent), 50);
                 }
 
+                const isDocSending = msg.status === 'sending';
                 const hasValidUrl = msg.url && msg.url !== 'null' && msg.url !== 'undefined';
-                const documentPreviewHtml = hasValidUrl ? `
+                const documentPreviewHtml = (hasValidUrl && !isDocSending) ? `
                     <a href="${msg.url}" target="_blank" rel="noopener noreferrer" class="document-preview">
                         <div class="document-icon-wrapper">
                             <span>${getFileIcon(msg.fileName)}</span>
@@ -5961,14 +5987,15 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                         </div>
                     </a>
                 ` : `
-                    <div class="document-preview document-uploading">
+                    <div class="document-preview document-uploading" style="display: flex; align-items: center; position: relative; gap: 8px;">
                         <div class="document-icon-wrapper">
                             <span>${getFileIcon(msg.fileName)}</span>
                         </div>
                         <div class="document-info">
                             <span class="document-name">${msg.fileName || 'Document'}</span>
-                            <span class="document-meta">Uploading document...</span>
+                            <span class="document-meta class-doc-progress">Uploading: 0%</span>
                         </div>
+                        <div class="spinner inline-media-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(0, 0, 0, 0.1); border-top-color: var(--brand-dark); border-radius: 50%; animation: spin 1s linear infinite; margin-left: auto; margin-right: 8px;"></div>
                     </div>
                 `;
 
@@ -6983,11 +7010,30 @@ const getChatIdForEntry = (userId, entryId) => {
     return entryId.startsWith('group_') ? entryId : [userId, entryId].sort().join('_');
 };
 
+const flushPendingMediaUploads = async () => {
+    if (pendingMediaSyncInFlight || !(await isOnline())) return;
+    pendingMediaSyncInFlight = true;
+    try {
+        const queue = [...pendingMediaUploadsQueue];
+        pendingMediaUploadsQueue = [];
+        for (const item of queue) {
+            processMediaUpload(item).catch(err => {
+                console.error("Failed to upload queued media on reconnect:", err);
+                // Put back in queue if failed
+                pendingMediaUploadsQueue.push(item);
+            });
+        }
+    } finally {
+        pendingMediaSyncInFlight = false;
+    }
+};
+
 const ensurePendingMessageSync = () => {
     if (pendingMessageSyncListenerAttached || typeof window === 'undefined') return;
     pendingMessageSyncListenerAttached = true;
     window.addEventListener('online', () => {
         flushPendingMessages();
+        flushPendingMediaUploads();
         markAllKnownChatsDelivered().catch(err => {
             console.warn('Error marking delivered messages on reconnect via browser online:', err);
         });
@@ -7003,6 +7049,7 @@ const ensurePendingMessageSync = () => {
             currentNetworkOnline = connected;
             if (connected) {
                 flushPendingMessages();
+                flushPendingMediaUploads();
                 markAllKnownChatsDelivered().catch(err => {
                     console.warn('Error marking delivered messages on reconnect via native network:', err);
                 });
@@ -7976,8 +8023,7 @@ const updateActiveChatSidebar = (activeChats) => {
 
     const filteredActive = {};
     Object.entries(activeChats).forEach(([id, profileWithMeta]) => {
-        // Filter out pending friend requests from the main chat list
-        if (currentIncomingRequests[id] || currentOutgoingRequests[id]) return;
+
 
         // Filter out locked chats
         if (isChatLocked && isChatLocked(id)) return;
