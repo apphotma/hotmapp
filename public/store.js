@@ -1,5 +1,5 @@
 import { elements } from './elements.js';
-import { showToast } from './toast.js';
+import { showToast, showActionSuccessAnimation } from './toast.js';
 import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.1.11';
 import { auth, db } from './firebase-config.js';
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
@@ -971,11 +971,11 @@ const renderSellerShopProducts = (products) => {
         const imagesAttr = JSON.stringify(product.images || []);
         const priceHtml = `<span class="product-currency">${product.currency}</span>${parsePrice(product.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">ON THE WAY</div>' : '';
+        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
         const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
         const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
         const btnHtml = product.soldOut 
-            ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6;">On the Way</button>'
+            ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6;">Ready Soon</button>'
             : '<button class="add-to-cart-btn">Add to Cart</button>';
 
         const shopHtml = `
@@ -1107,11 +1107,11 @@ const renderGeneralMarketProducts = (products) => {
             `;
         }
 
-        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">ON THE WAY</div>' : '';
+        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
         const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
         const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
         const btnHtml = product.soldOut 
-            ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6; margin-top: 10px;">On the Way</button>'
+            ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6; margin-top: 10px;">Ready Soon</button>'
             : `<button class="add-to-cart-btn" data-product-owner="${product.ownerId}" style="background: var(--brand); border-color: var(--brand-dark); margin-top: 10px;">View Shop</button>`;
 
         const generalMarketHtml = `
@@ -1199,13 +1199,13 @@ const renderGrids = (products) => {
 
         // Store Admin View Card - Filtered by owner (Inventory Management)
         if (product.ownerId === currentUserId) {
-            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="background: #e0a800;">ON THE WAY</div>' : '';
+            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="background: #e0a800;">READY SOON</div>' : '';
             const storeHtml = `
                 <div class="product-card ${product.soldOut ? 'is-sold-out' : ''} ${selectedProductIds.has(product.id) ? 'selected' : ''}" data-id="${product.id}" data-images='${imagesAttr}' data-sold-out="${!!product.soldOut}" data-ui="product-card">
                     <div class="product-checkbox"></div>
                     ${soldOutBadge}
                     <div class="product-actions">
-                        <button type="button" class="toggle-sold-out-btn" title="${product.soldOut ? 'Mark as Available' : 'Mark as On the Way'}">${product.soldOut ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-ban"></i>'}</button>
+                        <button type="button" class="toggle-sold-out-btn" title="${product.soldOut ? 'Mark as Available' : 'Mark as Ready Soon'}">${product.soldOut ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-ban"></i>'}</button>
                         <button type="button" class="edit-product-card-btn" title="Edit"><i class="fa-solid fa-pen"></i></button>
                         <button type="button" class="delete-product-card-btn" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -1249,7 +1249,7 @@ const updateSelectionUI = () => {
 /**
  * Triggers a full grid refresh using cached data
  */
-export const refreshStoreGrids = async ({ suppressShopAccessModal = false } = {}) => {
+export const refreshStoreGrids = async ({ suppressShopAccessModal = true } = {}) => {
     // Render products for both Admin (Inventory) and Shop grids
     renderGrids(cachedProducts);
 
@@ -1755,7 +1755,7 @@ export const initStore = () => {
                 <span class="store-selection-count" data-ui="store-selection-count">0</span> Selected
                 <div class="selection-actions" style="margin-left: auto; display: flex; gap: 10px;">
                     <button class="store-cancel-selection-btn" data-ui="store-cancel-selection-btn" style="background: #6c757d; border: none; color: white; padding: 5px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Exit selection mode"><i class="fa-solid fa-xmark"></i><span class="btn-text">Cancel</span></button>
-                    <button class="store-mass-sold-out-btn" data-ui="store-mass-sold-out-btn" style="background: #00a884; border: none; color: white; padding: 5px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Toggle On the Way status for all selected items"><i class="fa-solid fa-toggle-on"></i><span class="btn-text">Toggle On the Way</span></button>
+                    <button class="store-mass-sold-out-btn" data-ui="store-mass-sold-out-btn" style="background: #00a884; border: none; color: white; padding: 5px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Toggle Ready Soon status for all selected items"><i class="fa-solid fa-toggle-on"></i><span class="btn-text">Toggle Ready Soon</span></button>
                     <button class="store-mass-delete-btn" data-ui="store-mass-delete-btn" style="background: #cc0000; border: none; color: white; padding: 5px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Permanently delete all selected items"><i class="fa-solid fa-trash"></i><span class="btn-text">Delete</span></button>
                 </div>
             </div>`;
@@ -2488,6 +2488,22 @@ export const initStore = () => {
             renderPreviews([]);
             if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'none';
 
+            // Auto-fill currency with last used currency if exists
+            const lastCurrency = localStorage.getItem('hotmapp_last_currency');
+            if (lastCurrency && elements.productCurrencySelect) {
+                const hasPreset = Array.from(elements.productCurrencySelect.options).some(opt => opt.value === lastCurrency);
+                if (hasPreset) {
+                    elements.productCurrencySelect.value = lastCurrency;
+                    if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'none';
+                } else {
+                    elements.productCurrencySelect.value = 'custom';
+                    if (elements.productCustomCurrencyInput) {
+                        elements.productCustomCurrencyInput.value = lastCurrency;
+                        elements.productCustomCurrencyInput.style.display = 'block';
+                    }
+                }
+            }
+
             // Auto-fill category with business registration category
             if (elements.productCategoryInput && currentBusinessProfile?.category) {
                 elements.productCategoryInput.value = currentBusinessProfile.category;
@@ -2518,7 +2534,7 @@ export const initStore = () => {
     elements.storeMassSoldOutBtn?.addEventListener('click', async () => {
         if (selectedProductIds.size === 0) return;
 
-        // Check if any selected product is high-value and currently available (being marked as on the way)
+        // Check if any selected product is high-value and currently available (being marked as ready soon)
         let hasHighValueMarkingSoldOut = false;
         selectedProductIds.forEach(id => {
             const product = cachedProducts[id];
@@ -2528,7 +2544,7 @@ export const initStore = () => {
         });
 
         if (hasHighValueMarkingSoldOut) {
-            if (!confirm("One or more high-value products are selected to be marked as on the way. Proceed?")) return;
+            if (!confirm("One or more high-value products are selected to be marked as ready soon. Proceed?")) return;
         }
 
         const btn = elements.storeMassSoldOutBtn;
@@ -3005,18 +3021,18 @@ export const initStore = () => {
             const isSoldOut = card.dataset.soldOut === 'true';
             const productId = card.dataset.id;
 
-            // Add confirmation for high-value products when marking as on the way
+            // Add confirmation for high-value products when marking as ready soon
             if (!isSoldOut) {
                 const product = cachedProducts[productId];
                 if (product && parsePrice(product.price) >= HIGH_VALUE_THRESHOLD) {
-                    const confirmed = confirm(`This is a high-value product (${product.currency}${parsePrice(product.price).toFixed(2)}). Are you sure you want to mark it as on the way?`);
+                    const confirmed = confirm(`This is a high-value product (${product.currency}${parsePrice(product.price).toFixed(2)}). Are you sure you want to mark it as ready soon?`);
                     if (!confirmed) return;
                 }
             }
 
             // Update only the soldOut status in the database
             saveProduct(productId, { soldOut: !isSoldOut }).then(() => {
-                showToast(isSoldOut ? "Product is now available" : "Product marked as on the way", "info");
+                showToast(isSoldOut ? "Product is now available" : "Product marked as ready soon", "info");
             });
         } else if (e.target.closest('.delete-product-card-btn')) {
             const productId = card.dataset.id;
@@ -3179,6 +3195,11 @@ export const initStore = () => {
                 ownerId: user.uid, // Indicate the owner
                 storeQty: storeQty
             };
+
+            // Save used currency symbol for next time
+            if (currency) {
+                localStorage.setItem('hotmapp_last_currency', currency);
+            }
 
             const savedProductId = await saveProduct(editingProductId, productData);
             cachedProducts[savedProductId] = {
@@ -3726,7 +3747,14 @@ export const initStore = () => {
 
                 isBusinessRegistered = true;
                 currentBusinessProfile = pendingBusinessRegistrationData; // Update current profile
-                showToast(isEditingBusinessProfile ? "Business profile updated!" : "Business registered successfully!", "success");
+                if (typeof showActionSuccessAnimation === 'function') {
+                    showActionSuccessAnimation(
+                        isEditingBusinessProfile ? "Profile Updated!" : "Registration Complete!",
+                        isEditingBusinessProfile ? "Your business settings have been successfully updated." : "Welcome! Your Hotmapp store is now active and ready."
+                    );
+                } else {
+                    showToast(isEditingBusinessProfile ? "Business profile updated!" : "Business registered successfully!", "success");
+                }
 
                 // Directly update view and re-enable navigation
                 if (elements.businessRegistrationView) elements.businessRegistrationView.style.display = 'none';

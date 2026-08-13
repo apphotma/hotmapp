@@ -1,5 +1,5 @@
 import { elements } from './elements.js';
-import { showToast } from './toast.js';
+import { showToast, showActionSuccessAnimation } from './toast.js';
 import { getActiveChatUid } from './chat.js';
 import { debounce, calculateDistance, getHeuristicTravelTime, getTravelTimeFromAPI, getAvatarUrl, parsePrice } from './utils.js';
 import { auth, db } from './firebase-config.js'; // Import db
@@ -53,9 +53,39 @@ const formatPriceWithCommas = (priceVal) => {
 const getBase64ImageFromUrl = async (url) => {
     if (!url) return null;
     if (url.startsWith('data:')) return url;
+    
+    // 1. Try loading using an Image object with crossOrigin anonymous first (CORS-safe canvas draw)
+    try {
+        const imgPromise = new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/jpeg'));
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            img.onerror = (err) => reject(err);
+            // Set 4-second timeout for image load
+            setTimeout(() => reject(new Error("Timeout")), 4000);
+            img.src = url;
+        });
+        const res = await imgPromise;
+        if (res) return res;
+    } catch (err) {
+        console.warn("CORS canvas loading failed or timed out for:", url, err);
+    }
+
+    // 2. Fall back to direct fetch with a 5000ms timeout
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 800); // 800ms timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5000ms timeout
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         const blob = await response.blob();
@@ -66,7 +96,7 @@ const getBase64ImageFromUrl = async (url) => {
             reader.readAsDataURL(blob);
         });
     } catch (e) {
-        console.warn("Direct fetch failed or timed out for:", url);
+        console.warn("Direct fetch fallback failed or timed out for:", url, e);
         return null;
     }
 };
@@ -178,9 +208,12 @@ export const updateShopPickupLocations = async (bizProfile, userCoords = null, c
 
         if (blockReason) {
             if (!suppressShopAccessModal) {
-                if (shopContainer) shopContainer.style.display = 'none'; // Hide the shop content
-                if (shopNoResultsMessage) shopNoResultsMessage.style.display = 'none'; // Ensure search message is hidden
-                await openShopAccessRequestModal(currentActiveChatUid, sellerProfile, blockReason, null, showRequestBtn);
+                const isShopActive = elements.chatArea?.classList.contains('shop-mode-active') || false;
+                if (isShopActive) {
+                    if (shopContainer) shopContainer.style.display = 'none'; // Hide the shop content
+                    if (shopNoResultsMessage) shopNoResultsMessage.style.display = 'none'; // Ensure search message is hidden
+                    await openShopAccessRequestModal(currentActiveChatUid, sellerProfile, blockReason, null, showRequestBtn);
+                }
             }
             return; // Block shop view entirely or skip the access prompt on resume
         } else {
@@ -573,11 +606,11 @@ export const initShop = () => {
             const imagesAttr = JSON.stringify(product.images || []);
             const priceHtml = `<span class="product-currency">${product.currency}</span>${parsePrice(product.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             
-            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">ON THE WAY</div>' : '';
+            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
             const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
             const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
             const btnHtml = product.soldOut 
-                ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6;">On the Way</button>'
+                ? '<button class="add-to-cart-btn" disabled style="background: var(--muted); border-color: var(--muted); cursor: not-allowed; opacity: 0.6;">Ready Soon</button>'
                 : '<button class="add-to-cart-btn">Add to Cart</button>';
 
             const shopHtml = `
@@ -1994,40 +2027,51 @@ const handleStarRating = (e) => {
                     const detailText = detail ? ` (${detail})` : '';
                     const textX = imgBase64 ? 35 : 20;
 
-                    let currentX = textX;
+                    const prefix = `${index + 1}. `;
+                    const prefixWidth = doc.getTextWidth(prefix);
+                    const productName = item.name;
+
+                    // Line 1: Split product name to fit
+                    const nameLines = doc.splitTextToSize(productName, 135 - (textX + prefixWidth));
+
+                    // Line 2: Build description details underneath the name
+                    const detailsParts = [];
+                    if (item.form) {
+                        detailsParts.push(`(${item.form.trim()})`);
+                    }
+                    if (item.quantity !== undefined && item.quantity !== null) {
+                        detailsParts.push(`(Quantity: ${item.quantity})`);
+                    }
+                    detailsParts.push(`(${item.currency}${formatPriceWithCommas(item.price)} x ${item.quantity})`);
+                    const detailsText = detailsParts.join(' ');
+                    const detailsLines = doc.splitTextToSize(detailsText, 135 - (textX + prefixWidth));
+
                     // Draw index prefix in black
                     doc.setTextColor(0, 0, 0);
-                    const prefix = `${index + 1}. `;
-                    doc.text(prefix, currentX, y);
-                    currentX += doc.getTextWidth(prefix);
+                    doc.text(prefix, textX, y);
 
-                    // Draw product name in blue
+                    // Draw product name lines in blue
                     doc.setTextColor(...invoiceBlue);
-                    const productName = item.name;
-                    doc.text(productName, currentX, y);
-                    currentX += doc.getTextWidth(productName);
+                    nameLines.forEach((line, lineIdx) => {
+                        doc.text(line, textX + prefixWidth, y + (lineIdx * 5));
+                    });
 
-                    // Draw form details in blue bracket
-                    if (item.form) {
-                        const formText = ` (${item.form})`;
-                        doc.text(formText, currentX, y);
-                        currentX += doc.getTextWidth(formText);
-                    }
+                    // Draw details lines in black underneath product name lines
+                    const detailsStartY = y + (nameLines.length * 5);
+                    doc.setTextColor(0, 0, 0);
+                    detailsLines.forEach((line, lineIdx) => {
+                        doc.text(line, textX + prefixWidth, detailsStartY + (lineIdx * 5));
+                    });
 
-                    // Draw quantity details in blue bracket after form
-                    if (item.quantity !== undefined && item.quantity !== null) {
-                        const qtyText = ` (Quantity: ${item.quantity})`;
-                        doc.text(qtyText, currentX, y);
-                        currentX += doc.getTextWidth(qtyText);
-                    }
-
-                    // Draw pricing suffix in blue
-                    const suffix = ` (${item.currency}${formatPriceWithCommas(item.price)} x ${item.quantity})`;
-                    doc.text(suffix, currentX, y);
-
-                    // Draw item total in blue
+                    // Draw item total in blue (aligned to the first line)
+                    doc.setTextColor(...invoiceBlue);
                     doc.text(`${item.currency}${itemTotal}`, 170, y, { align: 'right' });
-                    y += 15;
+
+                    // Increment y dynamically based on total lines drawn to avoid overlaps
+                    const lineSpacing = 5;
+                    const totalLinesCount = nameLines.length + detailsLines.length;
+                    const itemHeight = Math.max(12, 5 + (totalLinesCount * lineSpacing));
+                    y += itemHeight;
                 });
 
                 doc.line(20, y, 190, y);
@@ -2142,27 +2186,6 @@ const handleStarRating = (e) => {
                     status: chatId.startsWith('group_') ? 'notified' : 'sent'
                 };
 
-                // Encrypt the invoice reference if E2EE is active
-                let otherProfile = null;
-                if (currentActiveChatUid && !currentActiveChatUid.startsWith('group_')) {
-                    otherProfile = await getUserProfile(currentActiveChatUid);
-                }
-                if (otherProfile && otherProfile.publicKey) {
-                    const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-                    if (sharedKey) {
-                        const payload = {
-                            text: `📄 Invoice #${orderNumber}`,
-                            invoiceId: orderId,
-                            url: localUrl,
-                            fileName: fileName,
-                            fileSize: pdfBlob.size
-                        };
-                        const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                        messageData.text = encrypted.ciphertext;
-                        messageData.isEncrypted = true;
-                        messageData.iv = encrypted.iv;
-                    }
-                }
 
                 await saveMessage(chatId, messageData);
 
@@ -2191,6 +2214,9 @@ const handleStarRating = (e) => {
                 }
 
                 // Success Animation
+                if (typeof showActionSuccessAnimation === 'function') {
+                    showActionSuccessAnimation("Order Placed Successfully!", "Your invoice and order details have been sent to the chat.");
+                }
                 btn.innerHTML = 'Order Placed ✓';
                 btn.classList.add('success');
 

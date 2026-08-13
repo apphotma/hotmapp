@@ -503,8 +503,17 @@ export const initProfile = () => {
 
     elements.refreshLocationCacheBtn?.addEventListener('click', async () => {
         if (confirm("This will clear cached country, state, and city data and re-fetch it. Continue?")) {
-            const { clearLocationCacheAndRefresh } = await import('./store.js');
-            await clearLocationCacheAndRefresh();
+            const btn = elements.refreshLocationCacheBtn;
+            const icon = btn?.querySelector('i');
+            if (btn) btn.disabled = true;
+            if (icon) icon.classList.add('fa-spin');
+            try {
+                const { clearLocationCacheAndRefresh } = await import('./store.js');
+                await clearLocationCacheAndRefresh();
+            } finally {
+                if (btn) btn.disabled = false;
+                if (icon) icon.classList.remove('fa-spin');
+            }
         }
     });
 
@@ -726,12 +735,18 @@ export const initProfile = () => {
 
     elements.refreshAnalyticsBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
-        elements.refreshAnalyticsBtn.disabled = true;
-        elements.refreshAnalyticsBtn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Refreshing...';
-        await loadPlatformAnalytics();
-        showToast("Analytics refreshed!", "success");
-        elements.refreshAnalyticsBtn.disabled = false;
-        elements.refreshAnalyticsBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate" style="margin-right: 6px;"></i> Refresh Stats';
+        const btn = elements.refreshAnalyticsBtn;
+        if (!btn) return;
+        const icon = btn.querySelector('i');
+        btn.disabled = true;
+        if (icon) icon.classList.add('fa-spin');
+        try {
+            await loadPlatformAnalytics();
+            showToast("Analytics refreshed!", "success");
+        } finally {
+            btn.disabled = false;
+            if (icon) icon.classList.remove('fa-spin');
+        }
     });
 
     const closeAdminAnalyticsModal = () => {

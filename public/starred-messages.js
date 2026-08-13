@@ -23,7 +23,7 @@ export const initStarredMessages = () => {
         } else {
             list.innerHTML = starredArray.map((msg, index) => {
                 const isPending = msg.status === 'pending' || (msg.id && msg.id.startsWith && msg.id.startsWith('pending_'));
-                const preview = (msg.isEncrypted && msg.previewText && !msg.isDecrypted) ? (msg.previewText + ' <small style="opacity:0.65; font-size:0.75rem; margin-left:6px;">🔒</small>') : (msg.isEncrypted ? '🔒 [Encrypted Message]' : (msg.text || (msg.type === 'image' ? '📷 Image' : '📄 File')));
+                const preview = msg.text || (msg.type === 'image' ? '📷 Image' : '📄 File');
                 const pendingIcon = isPending ? ' <span style="margin-left:6px; opacity:0.85;">⏳</span>' : '';
                 return `
                 <div class="starred-item" id="starred-item-${index}">

@@ -184,20 +184,16 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
     const newMessageRef = preGeneratedId ? child(messagesRef, preGeneratedId) : push(messagesRef);
     const timestamp = messageData.timestamp || serverTimestamp();
 
-    // Prefer a plaintext preview if supplied (e.g. when sender queued an encrypted message while offline)
+    // Prefer a plaintext preview if supplied
     let lastMsgPreview = null;
     let lastMsgIv = null;
     let lastMsgEncryptedFlag = messageData.isEncrypted || null;
 
-    if (messageData.isEncrypted) {
-        if (messageData.previewText) {
-            lastMsgPreview = messageData.previewText;
-            lastMsgIv = null;
-            lastMsgEncryptedFlag = null;
-        } else {
-            lastMsgPreview = messageData.text;
-            lastMsgIv = messageData.iv !== undefined ? messageData.iv : null;
-        }
+    if (messageData.previewText) {
+        lastMsgPreview = messageData.previewText;
+    } else if (messageData.isEncrypted) {
+        lastMsgPreview = messageData.text;
+        lastMsgIv = messageData.iv !== undefined ? messageData.iv : null;
     } else {
         lastMsgPreview = (messageData.type === 'text' || messageData.type === 'system') ? messageData.text : `[${messageData.type}]`;
     }

@@ -294,6 +294,16 @@ export const initAccount = () => {
         btn.innerHTML = '<span class="spinner"></span> Deleting Account...';
 
         try {
+            // Check if user signed in recently to prevent database tombstone mismatch on auth deletion failure
+            const lastSignIn = user.metadata.lastSignInTime;
+            const recentLoginThreshold = 5 * 60 * 1000; // 5 minutes
+            if (lastSignIn && (Date.now() - Date.parse(lastSignIn) > recentLoginThreshold)) {
+                showToast("For security, you must log out and sign in again to verify credentials before deleting.", "warning");
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                return;
+            }
+
             // 1. Perform database cleanup
             showToast("Cleaning up user products...", "info");
             await deleteUserProducts(user.uid);

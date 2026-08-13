@@ -366,7 +366,7 @@ const tryDecryptMessage = async (msg, senderId) => {
             const currentUser = auth.currentUser;
             if (!currentUser) {
                 console.warn("[E2EE DEBUG] tryDecryptMessage: No currentUser found.");
-                return "🔒 [Encrypted Message]";
+                return msg.text;
             }
 
             let otherUid = msg.senderId === currentUser.uid ? activeChatUid : msg.senderId;
@@ -375,7 +375,7 @@ const tryDecryptMessage = async (msg, senderId) => {
             }
             if (!otherUid) {
                 console.warn("[E2EE DEBUG] tryDecryptMessage: No otherUid could be determined. msg =", msg);
-                return "🔒 [Encrypted Message]";
+                return msg.text;
             }
 
             let otherProfile = allUsersCache[otherUid];
@@ -384,13 +384,13 @@ const tryDecryptMessage = async (msg, senderId) => {
             }
             if (!otherProfile || !otherProfile.publicKey) {
                 console.warn(`[E2EE DEBUG] tryDecryptMessage: publicProfile or publicKey missing for otherUid: ${otherUid}`, otherProfile);
-                return "🔒 [Encrypted Message]";
+                return msg.text;
             }
 
             const sharedKey = await getOrDeriveSharedKey(currentUser.uid, otherProfile.publicKey);
             if (!sharedKey) {
                 console.warn("[E2EE DEBUG] tryDecryptMessage: Failed to derive shared key with otherProfile.publicKey");
-                return "🔒 [Encrypted Message]";
+                return msg.text;
             }
 
             try {
@@ -399,13 +399,13 @@ const tryDecryptMessage = async (msg, senderId) => {
                 return decrypted;
             } catch (e) {
                 console.error("[E2EE DEBUG] tryDecryptMessage: Decryption via SubtleCrypto failed:", e);
-                return "🔒 [Decryption failed]";
+                return msg.text;
             }
         }
         return msg.text;
     } catch (e) {
         console.error("[E2EE DEBUG] tryDecryptMessage error in outer wrapper:", e);
-        return "🔒 [Decryption failed]";
+        return msg.text;
     }
 };
 
@@ -503,14 +503,14 @@ const decryptPendingMessages = async () => {
 
 const tryDecryptPreview = async (otherUid, ciphertext, iv) => {
     const currentUser = auth.currentUser;
-    if (!currentUser || !otherUid || !ciphertext || !iv) return "🔒 [Encrypted Message]";
+    if (!currentUser || !otherUid || !ciphertext || !iv) return ciphertext;
     let otherProfile = allUsersCache[otherUid];
     if (!otherProfile || !otherProfile.publicKey) {
         otherProfile = await getUserProfile(otherUid);
     }
-    if (!otherProfile || !otherProfile.publicKey) return "🔒 [Encrypted Message]";
+    if (!otherProfile || !otherProfile.publicKey) return ciphertext;
     const sharedKey = await getOrDeriveSharedKey(currentUser.uid, otherProfile.publicKey);
-    if (!sharedKey) return "🔒 [Encrypted Message]";
+    if (!sharedKey) return ciphertext;
     try {
         const decrypted = await decryptText(ciphertext, iv, sharedKey);
         if (decrypted && decrypted.startsWith('{') && decrypted.endsWith('}')) {
@@ -523,7 +523,7 @@ const tryDecryptPreview = async (otherUid, ciphertext, iv) => {
         }
         return decrypted;
     } catch (e) {
-        return "🔒 [Decryption failed]";
+        return ciphertext;
     }
 };
 
@@ -541,27 +541,6 @@ const renderE2EENotice = (hasKeys) => {
     if (!elements.messagesContainer) return;
     const existingNotice = elements.messagesContainer.querySelector('.e2ee-chat-notice');
     if (existingNotice) existingNotice.remove();
-
-    const noticeHtml = hasKeys ? `
-        <div class="e2ee-chat-notice" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 168, 132, 0.08); border: 1px dashed rgba(0, 168, 132, 0.3); border-radius: 12px; padding: 12px 16px; margin: 15px auto 20px auto; max-width: 85%; text-align: center; font-size: 0.82rem; color: var(--text); gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 6px; color: var(--brand); font-weight: 700;">
-                <i class="fa-solid fa-lock" style="font-size: 0.85rem;"></i> End-to-End Encrypted
-            </div>
-            <div style="color: var(--muted); line-height: 1.4;">
-                Messages and calls are secured with end-to-end encryption. No one outside of this chat, not even Hotmapp, can read or listen to them.
-            </div>
-        </div>
-    ` : `
-        <div class="e2ee-chat-notice" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 168, 132, 0.08); border: 1px dashed rgba(0, 168, 132, 0.3); border-radius: 12px; padding: 12px 16px; margin: 15px auto 20px auto; max-width: 85%; text-align: center; font-size: 0.82rem; color: var(--text); gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 6px; color: var(--brand); font-weight: 700;">
-                <i class="fa-solid fa-comments" style="font-size: 0.85rem;"></i> Standard Chat
-            </div>
-            <div style="color: var(--muted); line-height: 1.4;">
-                Messages in this chat are not end-to-end encrypted.
-            </div>
-        </div>
-    `;
-    elements.messagesContainer.insertAdjacentHTML('afterbegin', noticeHtml);
 };
 
 // Initialize PDF.js worker
@@ -743,10 +722,18 @@ const setupLightboxUI = (msg, url, isProfilePhoto) => {
             elements.lightboxForwardBtn.style.display = 'flex';
             elements.lightboxForwardBtn.onclick = async () => {
                 if (elements.lightboxModal) elements.lightboxModal.style.display = 'none';
-                pendingForwardData = [{
-                    text: msg.text || '',
-                    type: msg.type,
+                try {
+                    if (msg.isEncrypted && !msg.isDecrypted) {
+                        await decryptMessageInPlace(msg, { cache: false });
+                    }
+                } catch (e) {
+                    console.warn('Failed to decrypt lightbox message for forward preview', e);
+                }
 
+                pendingForwardData = [{
+                    text: (msg.isDecrypted ? msg.text : (msg.previewText || msg.text)) || '',
+                    previewText: msg.previewText || (msg.isDecrypted ? msg.text : undefined),
+                    type: msg.type,
                     url: msg.url || null,
                     fileName: msg.fileName || null,
                     fileSize: msg.fileSize || null
@@ -2010,9 +1997,8 @@ const populateForwardUserList = async () => {
                     const isEncrypted = item.isEncrypted;
                     const isPending = item.status === 'pending' || (item.id && item.id.startsWith && item.id.startsWith('pending_'));
                     const text = item.previewText || item.text || (item.type === 'image' ? '📷 Image' : (item.type === 'document' ? '📄 File' : `[${item.type}]`));
-                    const lock = (isEncrypted && !item.isDecrypted) ? ' <span style="opacity:0.65; font-size:0.85em; margin-left:6px;">🔒</span>' : '';
                     const pendingIcon = isPending ? ' <span style="margin-left:6px; opacity:0.8; font-size:0.9em;">⏳</span>' : '';
-                    return `<div class="forward-preview-item" style="padding:6px 0; border-bottom:1px dashed var(--border); font-size:0.92rem;">${text}${lock}${pendingIcon}</div>`;
+                    return `<div class="forward-preview-item" style="padding:6px 0; border-bottom:1px dashed var(--border); font-size:0.92rem;">${text}${pendingIcon}</div>`;
                 }).join('');
             } else {
                 previewContainer.style.display = 'none';
@@ -2078,13 +2064,29 @@ const handleMassForward = async () => {
     if (selectedMessages.size === 0) return;
 
     // Capture the actual message data immediately to prevent data loss if the chat context changes
-    pendingForwardData = Array.from(selectedMessages).map(id => {
+    // Ensure encrypted messages are decrypted (if possible) before capturing the text to forward.
+    pendingForwardData = [];
+    for (const id of Array.from(selectedMessages)) {
         const msg = messages.find(m => m.id === id);
-        if (!msg) return null;
+        if (!msg) continue;
+        try {
+            if (msg.isEncrypted && !msg.isDecrypted) {
+                // attempt decryption for forwarding preview (don't persist to cache here)
+                await decryptMessageInPlace(msg, { cache: false });
+            }
+        } catch (e) {
+            console.warn('Failed to decrypt message for forwarding preview', e);
+        }
+
         // Strip metadata that shouldn't be cloned to a new room
-        const { id: _, timestamp: __, status: ___, isStarred: ____, starredAt: _____, ...cleanData } = msg;
-        return cleanData;
-    }).filter(m => !!m);
+        const { id: _, timestamp: __, status: ___, isStarred: ____, starredAt: _____, ...rest } = msg;
+        // prefer previewText if present, otherwise prefer decrypted text when available
+        const cleanData = {
+            ...rest,
+            previewText: rest.previewText || (rest.isDecrypted ? rest.text : undefined)
+        };
+        pendingForwardData.push(cleanData);
+    }
 
     if (pendingForwardData.length === 0) return;
 
@@ -2119,19 +2121,6 @@ const executeForward = async (targetUid, messagesToForward) => {
     const currentUser = auth.currentUser;
     const chatId = targetUid.startsWith('group_') ? targetUid : [currentUser.uid, targetUid].sort().join('_');
 
-    let targetProfile = null;
-    if (!targetUid.startsWith('group_')) {
-        targetProfile = allUsersCache[targetUid];
-        if (!targetProfile || !targetProfile.publicKey) {
-            targetProfile = await getUserProfile(targetUid);
-        }
-    }
-    const isTargetE2EE = targetProfile && targetProfile.publicKey;
-    let sharedKey = null;
-    if (isTargetE2EE) {
-        sharedKey = await getOrDeriveSharedKey(currentUser.uid, targetProfile.publicKey);
-    }
-
     const forwardPromises = messagesToForward.map(async (data) => {
         let messageData = {
             ...data,
@@ -2143,40 +2132,8 @@ const executeForward = async (targetUid, messagesToForward) => {
         delete messageData.timestamp;
         delete messageData.status;
 
-        if (isTargetE2EE && sharedKey) {
-            const payload = {
-                text: messageData.text || ''
-            };
-            if (messageData.url) payload.url = messageData.url;
-            if (messageData.fileName) payload.fileName = messageData.fileName;
-            if (messageData.fileSize) payload.fileSize = messageData.fileSize;
-            if (messageData.thumbnailUrl) payload.thumbnailUrl = messageData.thumbnailUrl;
-            if (messageData.latitude !== undefined) payload.latitude = messageData.latitude;
-            if (messageData.longitude !== undefined) payload.longitude = messageData.longitude;
-            if (messageData.address) payload.address = messageData.address;
-            if (messageData.staticMapUrl) payload.staticMapUrl = messageData.staticMapUrl;
-            if (messageData.mapUrl) payload.mapUrl = messageData.mapUrl;
-            if (messageData.replyTo) payload.replyTo = messageData.replyTo;
-
-            const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-            messageData.text = encrypted.ciphertext;
-            messageData.isEncrypted = true;
-            messageData.iv = encrypted.iv;
-
-            messageData.url = null;
-            messageData.fileName = null;
-            messageData.fileSize = null;
-            messageData.thumbnailUrl = null;
-            delete messageData.latitude;
-            delete messageData.longitude;
-            messageData.address = null;
-            messageData.staticMapUrl = null;
-            messageData.mapUrl = null;
-            messageData.replyTo = null;
-        } else {
-            messageData.isEncrypted = null;
-            messageData.iv = null;
-        }
+        messageData.isEncrypted = null;
+        messageData.iv = null;
 
         return saveMessage(chatId, messageData);
     });
@@ -2785,38 +2742,7 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
         };
         if (videoDuration) messageData.duration = videoDuration;
 
-        let otherProfile = null;
-        if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid];
-            if (!otherProfile || !otherProfile.publicKey) {
-                otherProfile = await getUserProfile(activeChatUid);
-            }
-        }
-        if (otherProfile && otherProfile.publicKey) {
-            const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-            if (sharedKey) {
-                const payload = {
-                    text: type === 'image' ? '📷 Image' : (type === 'video' ? '🎥 Video' : (type === 'audio' ? '🎵 Audio' : `📄 ${fileName || 'Document'}`)),
-                    url: downloadURL,
-                    fileName: messageData.fileName,
-                    fileSize: messageData.fileSize,
-                    thumbnailUrl: thumbnailUrl,
-                    replyTo: replyData,
-                    duration: videoDuration
-                };
-                const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                messageData.text = encrypted.ciphertext;
-                messageData.isEncrypted = true;
-                messageData.iv = encrypted.iv;
 
-                messageData.url = null;
-                messageData.fileName = null;
-                messageData.fileSize = null;
-                messageData.thumbnailUrl = null;
-                messageData.replyTo = null;
-                delete messageData.duration;
-            }
-        }
 
         await saveMessage(chatId, messageData, preGeneratedId);
         hideReplyPreview();
@@ -3282,34 +3208,7 @@ const initLocation = () => {
                 const chatId = activeChatUid.startsWith('group_') ? activeChatUid : [user.uid, activeChatUid].sort().join('_');
                 const updates = { liveSharingEnded: true };
 
-                let otherProfile = null;
-                if (!activeChatUid.startsWith('group_')) {
-                    otherProfile = allUsersCache[activeChatUid];
-                    if (!otherProfile || !otherProfile.publicKey) {
-                        otherProfile = await getUserProfile(activeChatUid);
-                    }
-                }
-                if (otherProfile && otherProfile.publicKey) {
-                    const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-                    if (sharedKey) {
-                        const origMsg = messages.find(m => m.id === currentLiveLocationMessageId);
-                        const payload = {
-                            text: '🛰️ Live Location (Ended)',
-                            latitude: origMsg?.latitude || null,
-                            longitude: origMsg?.longitude || null,
-                            address: 'Live sharing ended',
-                            mapUrl: origMsg?.mapUrl || null,
-                            staticMapUrl: origMsg?.staticMapUrl || null,
-                            liveSharingEnded: true
-                        };
-                        const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                        updates.text = encrypted.ciphertext;
-                        updates.isEncrypted = true;
-                        updates.iv = encrypted.iv;
-                    }
-                } else {
-                    updates.address = 'Live sharing ended';
-                }
+                updates.address = 'Live sharing ended';
 
                 await updateMessage(chatId, currentLiveLocationMessageId, updates);
             }
@@ -3351,36 +3250,7 @@ const initLocation = () => {
             staticMapUrl: staticMapUrl
         };
 
-        let otherProfile = null;
-        if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid];
-            if (!otherProfile || !otherProfile.publicKey) {
-                otherProfile = await getUserProfile(activeChatUid);
-            }
-        }
-        if (otherProfile && otherProfile.publicKey) {
-            const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-            if (sharedKey) {
-                const payload = {
-                    text: '🛰️ Live Location',
-                    latitude: latitude,
-                    longitude: longitude,
-                    address: address,
-                    mapUrl: mapUrl,
-                    staticMapUrl: staticMapUrl
-                };
-                const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                updates.text = encrypted.ciphertext;
-                updates.isEncrypted = true;
-                updates.iv = encrypted.iv;
 
-                delete updates.latitude;
-                delete updates.longitude;
-                updates.address = null;
-                updates.mapUrl = null;
-                updates.staticMapUrl = null;
-            }
-        }
 
         await updateMessage(chatId, messageId, updates);
     };
@@ -3765,36 +3635,7 @@ const initLocation = () => {
             status: chatId.startsWith('group_') ? 'notified' : 'sent'
         };
 
-        let otherProfile = null;
-        if (!activeChatUid.startsWith('group_')) {
-            otherProfile = allUsersCache[activeChatUid];
-            if (!otherProfile || !otherProfile.publicKey) {
-                otherProfile = await getUserProfile(activeChatUid);
-            }
-        }
-        if (otherProfile && otherProfile.publicKey) {
-            const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-            if (sharedKey) {
-                const payload = {
-                    text: isLive ? '🛰️ Live Location' : '📍 Location',
-                    latitude: latitude,
-                    longitude: longitude,
-                    address: address,
-                    mapUrl: mapUrl,
-                    staticMapUrl: staticMapUrl
-                };
-                const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                messageData.text = encrypted.ciphertext;
-                messageData.isEncrypted = true;
-                messageData.iv = encrypted.iv;
 
-                delete messageData.latitude;
-                delete messageData.longitude;
-                messageData.address = null;
-                messageData.mapUrl = null;
-                messageData.staticMapUrl = null;
-            }
-        }
 
         const messageId = await saveMessage(chatId, messageData);
         return messageId; // Return the message ID
@@ -5827,31 +5668,7 @@ const isLikelyEncryptedMessage = (msg) => {
 
 const getMessageTextForDisplay = (msg, currentUser) => {
     if (!msg) return '';
-
-    const textValue = normalizeMessageText(msg.text);
-    const previewValue = msg.previewText ? normalizeMessageText(msg.previewText) : '';
-    const isEncryptedPending = isLikelyEncryptedMessage(msg);
-
-    if (isEncryptedPending) {
-        if (previewValue) {
-            if (msg.text && msg.text.startsWith("🔒")) {
-                return msg.text;
-            }
-            // Senders should see their own plaintext preview immediately.
-            if (msg.senderId === currentUser?.uid) {
-                return previewValue;
-            }
-            return previewValue;
-        }
-
-        if (!msg._decryptionToastShown) {
-            showToast("This encrypted message is decrypting in the background. Reopen the chat to see the real text.", "info");
-            msg._decryptionToastShown = true;
-        }
-        return ENCRYPTED_BACKGROUND_PLACEHOLDER;
-    }
-
-    return textValue;
+    return normalizeMessageText(msg.text);
 };
 
 const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
@@ -6317,11 +6134,7 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 break;
             default:
                 const displayTextBase = getMessageTextForDisplay(msg, user);
-                let displayText = displayTextBase;
-                if (msg.isEncrypted && !msg.isDecrypted && msg.previewText && msg.senderId !== user.uid) {
-                    displayText = `${normalizeMessageText(msg.previewText)} <small style="opacity:0.65; font-size:0.75rem; margin-left:6px;">🔒</small>`;
-                }
-                const linkedText = linkifyText(displayText);
+                const linkedText = linkifyText(displayTextBase);
                 contentHtml = `<div class="message-text">${linkedText + (msg.edited ? ' <small style="opacity:0.5; font-size:0.7rem; font-style:italic;">(edited)</small>' : '')}</div>`;
         }
     }
@@ -6587,13 +6400,10 @@ const startMessageListener = async (otherUid) => {
         if (elements.messageInputArea) elements.messageInputArea.style.display = 'flex';
         if (elements.chatActions) elements.chatActions.style.display = 'flex';
 
-        // Set standard unlock icon for groups
+        // Set standard unlock icon for groups (removed)
         if (elements.chatHeaderName) {
             const existingLock = elements.chatHeaderName.parentNode.querySelector('.e2ee-header-lock');
             if (existingLock) existingLock.remove();
-
-            const lockIcon = `<i class="fa-solid fa-unlock e2ee-header-lock" title="Standard Chat" style="color: var(--muted); margin-left: 6px; font-size: 0.85rem; cursor: help;"></i>`;
-            elements.chatHeaderName.insertAdjacentHTML('afterend', lockIcon);
         }
 
         renderE2EENotice(false);
@@ -6710,11 +6520,6 @@ const startMessageListener = async (otherUid) => {
                 if (elements.userStatus) {
                     // Live update Name and Avatar in the Header
                     if (elements.chatHeaderName) {
-                        const isE2EE = !!(profile.publicKey);
-                        const lockIcon = isE2EE
-                            ? `<i class="fa-solid fa-lock e2ee-header-lock" title="End-to-End Encrypted" style="color: var(--brand); margin-left: 6px; font-size: 0.85rem; cursor: help;"></i>`
-                            : `<i class="fa-solid fa-unlock e2ee-header-lock" title="Standard Chat" style="color: var(--muted); margin-left: 6px; font-size: 0.85rem; cursor: help;"></i>`;
-
                         // Remove existing lock icon to avoid duplicate indicators
                         const existingLock = elements.chatHeaderName.parentNode.querySelector('.e2ee-header-lock');
                         if (existingLock) existingLock.remove();
@@ -7158,7 +6963,7 @@ const queuePendingMessage = (messageData, chatId) => {
         try {
             const previewEl = document.querySelector(`.conversation-item[data-uid="${activeChatUid}"] .conversation-preview`);
             if (previewEl) {
-                const previewText = pendingMessage.previewText || (pendingMessage.isEncrypted ? '🔒 [Encrypted]' : (pendingMessage.text || ''));
+                const previewText = pendingMessage.previewText || pendingMessage.text || '';
                 // Show a pending indicator for queued messages
                 previewEl.innerHTML = `${pendingMessage.senderId === auth.currentUser.uid ? 'You: ' : ''}${previewText} <span class="pending-preview" style="margin-left:6px; opacity:0.8; font-size:0.85em;">⏳</span>`;
             }
@@ -7305,31 +7110,8 @@ const sendMessage = async () => {
             return;
         }
     }
-    const isE2EE = otherProfile && otherProfile.publicKey;
 
     if (editingMessageId) {
-        if (isE2EE) {
-            const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-            if (sharedKey) {
-                const payload = { text: text };
-                const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                await updateMessage(chatId, editingMessageId, {
-                    text: encrypted.ciphertext,
-                    isEncrypted: true,
-                    iv: encrypted.iv,
-                    edited: true
-                });
-                hideEditPreview();
-                updateTypingPresence(false);
-                if (elements.messageInput) {
-                    elements.messageInput.value = '';
-                    elements.messageInput.style.height = 'auto';
-                }
-                toggleInputButtons();
-                hideTypingIndicator();
-                return;
-            }
-        }
         await updateMessage(chatId, editingMessageId, { text: text, edited: true });
         hideEditPreview();
     } else {
@@ -7346,21 +7128,6 @@ const sendMessage = async () => {
                 ephemeralExpiry: ephemeralExpiryDuration > 0 ? Date.now() + ephemeralExpiryDuration : null,
                 replyTo: replyData
             };
-
-            if (isE2EE) {
-                const sharedKey = await getOrDeriveSharedKey(user.uid, otherProfile.publicKey);
-                if (sharedKey) {
-                    const payload = {
-                        text: text,
-                        replyTo: replyData
-                    };
-                    const encrypted = await encryptText(JSON.stringify(payload), sharedKey);
-                    messageData.text = encrypted.ciphertext;
-                    messageData.isEncrypted = true;
-                    messageData.iv = encrypted.iv;
-                    messageData.replyTo = null;
-                }
-            }
 
             const messageId = push(ref(db, `messages/${chatId}`)).key;
             const pendingMessageData = {

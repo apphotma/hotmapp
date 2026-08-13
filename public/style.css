@@ -4305,6 +4305,21 @@ iframe {
         max-width: 100% !important;
     }
 
+    #business-registration-form .form-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    #business-registration-form button[data-ui="country-trigger"],
+    #business-registration-form button[data-ui="countries-trigger"],
+    #business-registration-form button[data-ui="states-trigger"],
+    #business-registration-form button[data-ui="cities-trigger"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+
     .wizard-progress {
         margin-bottom: 20px !important;
         gap: 10px !important;
@@ -9662,4 +9677,320 @@ body.dark-theme .link-qr-wrapper {
     color: var(--muted);
     border-radius: 8px;
     padding: 20px;
+}
+
+/* Make Business Registration Form fields fully stack and stretch on responsive screen widths */
+@media (max-width: 768px) {
+    #business-registration-form .form-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    #business-registration-form button[data-ui="country-trigger"],
+    #business-registration-form button[data-ui="countries-trigger"],
+    #business-registration-form button[data-ui="states-trigger"],
+    #business-registration-form button[data-ui="cities-trigger"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+}
+
+/* Premium Toast Animations & Styling */
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    min-width: 300px;
+    max-width: 90vw;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    position: relative;
+    overflow: visible;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-icon {
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.toast.success {
+    background: rgba(46, 125, 50, 0.95);
+}
+
+.toast.error {
+    background: rgba(211, 47, 47, 0.95);
+}
+
+.toast.warning {
+    background: rgba(237, 108, 2, 0.95);
+}
+
+.toast.info {
+    background: rgba(2, 136, 209, 0.95);
+}
+
+.toast-message {
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: white;
+}
+
+/* Success Checkmark Drawing SVG */
+.toast-success-icon-wrapper {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.toast-success-checkmark {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: block;
+    stroke-width: 4;
+    stroke: #fff;
+    stroke-miterlimit: 10;
+    box-shadow: inset 0px 0px 0px #fff;
+    animation: fill-checkmark .4s ease-in-out .4s forwards, scale-checkmark .3s ease-in-out .9s both;
+}
+
+.toast-success-checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 4;
+    stroke-miterlimit: 10;
+    stroke: #fff;
+    fill: none;
+    animation: stroke-checkmark 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.toast-success-checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke-width: 4;
+    stroke: #fff;
+    animation: stroke-checkmark 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+}
+
+@keyframes stroke-checkmark {
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes scale-checkmark {
+    0%, 100% {
+        transform: none;
+    }
+    50% {
+        transform: scale3d(1.15, 1.15, 1);
+    }
+}
+
+@keyframes fill-checkmark {
+    100% {
+        box-shadow: inset 0px 0px 0px 30px rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Confetti Sparkles */
+.toast-confetti-emitter {
+    position: absolute;
+    top: 50%;
+    left: 24px;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.toast-confetti-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color);
+    top: -3px;
+    left: -3px;
+    opacity: 0;
+    animation: burst-confetti 0.7s cubic-bezier(0.1, 0.8, 0.3, 1) var(--delay) forwards;
+}
+
+@keyframes burst-confetti {
+    0% {
+        transform: translate(0, 0) scale(0);
+        opacity: 1;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--x), var(--y)) scale(1);
+        opacity: 0;
+    }
+}
+
+/* Toast exit animation */
+.toast-out {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+}
+
+/* Fullscreen Success Overlay styling */
+.success-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(15px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: success-fade-in 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+.success-fullscreen-card {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 28px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    max-width: 420px;
+    width: 90%;
+    transform: scale(0.85);
+    opacity: 0;
+    animation: success-card-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.1s forwards;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.success-checkmark-wrapper {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.success-large-checkmark {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: block;
+    stroke-width: 4;
+    stroke: #2e7d32;
+    stroke-miterlimit: 10;
+    box-shadow: inset 0px 0px 0px #2e7d32;
+    animation: fill-large-checkmark .4s ease-in-out .4s forwards, scale-checkmark .3s ease-in-out .9s both;
+}
+
+.success-large-checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 4;
+    stroke-miterlimit: 10;
+    stroke: #2e7d32;
+    fill: none;
+    animation: stroke-checkmark 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.success-large-checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke-width: 4;
+    stroke: #2e7d32;
+    animation: stroke-checkmark 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+}
+
+@keyframes fill-large-checkmark {
+    100% {
+        box-shadow: inset 0px 0px 0px 40px rgba(46, 125, 80, 0.15);
+    }
+}
+
+.success-large-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #232f30;
+    margin: 0 0 10px;
+}
+
+.success-large-subtitle {
+    font-size: 0.95rem;
+    color: #667781;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Large Confetti Explosion */
+.success-confetti-canvas-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.success-large-confetti-particle {
+    position: absolute;
+    width: 8px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--color);
+    top: -7px;
+    left: -4px;
+    opacity: 0;
+    animation: burst-large-confetti 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) var(--delay) forwards;
+}
+
+@keyframes burst-large-confetti {
+    0% {
+        transform: translate(0, 0) scale(0) rotate(0deg);
+        opacity: 1;
+    }
+    30% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--x), var(--y)) scale(1.1) rotate(var(--rotate));
+        opacity: 0;
+    }
+}
+
+@keyframes success-fade-in {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes success-card-in {
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.success-overlay-out {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.success-overlay-out .success-fullscreen-card {
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.4s ease;
 }
