@@ -6,6 +6,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ScreenSharePlugin.class);
         super.onCreate(savedInstanceState);
         this.bridge.getWebView().setWebChromeClient(new CustomWebChromeClient(this.bridge));
     }

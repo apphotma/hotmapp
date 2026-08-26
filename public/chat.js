@@ -4579,29 +4579,121 @@ const switchMicrophone = async (deviceId) => {
     }
 };
 
+let nativeScreenShareListener = null;
+let nativeScreenStoppedListener = null;
+let nativeScreenCanvas = null;
+let nativeScreenRenderTimer = null;
+let lastNativeScreenFrameImg = null;
+
 const startScreenSharing = async () => {
     if (isScreenSharing || peerConnections.size === 0) return;
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    const isNativeAndroid = Boolean(window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.ScreenShare);
+
+    if (!isNativeAndroid && (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia)) {
         showToast("Screen sharing is not supported on this device/platform.", "warning");
         return;
     }
 
     try {
-        // Show a helpful guidance toast to prevent user confusion with native browser screen selection UI
-        showToast("Please click/select the screen thumbnail in the browser popup, then click Share.", "info", 6000);
+        if (isNativeAndroid) {
+            // Native Android MediaProjection Flow
+            showToast("Please tap 'Start now' on the Android screen prompt...", "info", 5000);
 
-        // Limit screen resolution to 1080p max to prevent Android hardware encoder from crashing on portrait screens
-        const screenConstraints = {
-            video: {
-                width: { max: 1920 },
-                height: { max: 1080 },
-                frameRate: { ideal: 15, max: 30 }
+            if (!nativeScreenCanvas) {
+                nativeScreenCanvas = document.createElement('canvas');
+                nativeScreenCanvas.width = 480;
+                nativeScreenCanvas.height = 854;
             }
-        };
+            const ctx = nativeScreenCanvas.getContext('2d');
 
-        screenStream = await navigator.mediaDevices.getDisplayMedia(screenConstraints);
+            // Draw initial placeholder frame so captureStream immediately has valid pixel data
+            ctx.fillStyle = "#111b21";
+            ctx.fillRect(0, 0, nativeScreenCanvas.width, nativeScreenCanvas.height);
+            ctx.fillStyle = "#25d366";
+            ctx.font = "bold 20px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("HOTMAPP Screen Share", nativeScreenCanvas.width / 2, nativeScreenCanvas.height / 2);
+
+            // Initialize canvas stream at 15 FPS for smooth WebRTC transmission
+            screenStream = nativeScreenCanvas.captureStream(15);
+
+            isScreenSharing = true;
+
+            // Clean up any stale listeners and render loop
+            if (nativeScreenRenderTimer) {
+                clearInterval(nativeScreenRenderTimer);
+                nativeScreenRenderTimer = null;
+            }
+            if (nativeScreenShareListener) {
+                await nativeScreenShareListener.remove();
+                nativeScreenShareListener = null;
+            }
+            if (nativeScreenStoppedListener) {
+                await nativeScreenStoppedListener.remove();
+                nativeScreenStoppedListener = null;
+            }
+
+            // Maintain continuous 15 FPS redraw loop so WebRTC encoder continuously transmits
+            nativeScreenRenderTimer = setInterval(() => {
+                if (!isScreenSharing) {
+                    if (nativeScreenRenderTimer) clearInterval(nativeScreenRenderTimer);
+                    nativeScreenRenderTimer = null;
+                    return;
+                }
+                if (lastNativeScreenFrameImg && lastNativeScreenFrameImg.complete && lastNativeScreenFrameImg.naturalWidth > 0) {
+                    ctx.drawImage(lastNativeScreenFrameImg, 0, 0, nativeScreenCanvas.width, nativeScreenCanvas.height);
+                }
+            }, 66);
+
+            let isDrawing = false;
+
+            nativeScreenShareListener = await window.Capacitor.Plugins.ScreenShare.addListener('screenFrame', (data) => {
+                if (!isScreenSharing || !data || !data.frame || isDrawing) return;
+                isDrawing = true;
+                const frameImg = new Image();
+                frameImg.onload = () => {
+                    if (nativeScreenCanvas.width !== frameImg.width || nativeScreenCanvas.height !== frameImg.height) {
+                        nativeScreenCanvas.width = frameImg.width;
+                        nativeScreenCanvas.height = frameImg.height;
+                    }
+                    ctx.drawImage(frameImg, 0, 0);
+                    lastNativeScreenFrameImg = frameImg;
+                    isDrawing = false;
+                };
+                frameImg.onerror = () => {
+                    isDrawing = false;
+                };
+                frameImg.src = 'data:image/jpeg;base64,' + data.frame;
+            });
+
+            nativeScreenStoppedListener = await window.Capacitor.Plugins.ScreenShare.addListener('screenStopped', () => {
+                console.log("Native screen capture stopped by system");
+                stopScreenSharing();
+            });
+
+            // Start native MediaProjection activity & foreground service
+            await window.Capacitor.Plugins.ScreenShare.start();
+
+        } else {
+            // Desktop Browser Flow
+            showToast("Please click/select the screen thumbnail in the browser popup, then click Share.", "info", 6000);
+
+            const screenConstraints = {
+                video: {
+                    width: { max: 1920 },
+                    height: { max: 1080 },
+                    frameRate: { ideal: 15, max: 30 }
+                }
+            };
+
+            screenStream = await navigator.mediaDevices.getDisplayMedia(screenConstraints);
+        }
+
         const screenTrack = screenStream.getVideoTracks()[0];
+        if (!screenTrack) {
+            throw new Error("No video track available from screen stream.");
+        }
 
         screenTrack.onended = () => {
             stopScreenSharing();
@@ -4667,6 +4759,19 @@ const startScreenSharing = async () => {
         console.error("Error starting screen share:", err);
         showToast(`Could not share screen: ${err.message || err}`, "error", 6000);
         isScreenSharing = false;
+
+        if (isNativeAndroid && window.Capacitor?.Plugins?.ScreenShare) {
+            window.Capacitor.Plugins.ScreenShare.stop().catch(() => {});
+            if (nativeScreenShareListener) {
+                nativeScreenShareListener.remove();
+                nativeScreenShareListener = null;
+            }
+            if (nativeScreenStoppedListener) {
+                nativeScreenStoppedListener.remove();
+                nativeScreenStoppedListener = null;
+            }
+        }
+
         if (screenStream) {
             screenStream.getTracks().forEach(track => track.stop());
             screenStream = null;
@@ -4676,6 +4781,26 @@ const startScreenSharing = async () => {
 
 const stopScreenSharing = async () => {
     if (!isScreenSharing) return;
+
+    if (nativeScreenRenderTimer) {
+        clearInterval(nativeScreenRenderTimer);
+        nativeScreenRenderTimer = null;
+    }
+    lastNativeScreenFrameImg = null;
+
+    const isNativeAndroid = Boolean(window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.ScreenShare);
+
+    if (isNativeAndroid && window.Capacitor?.Plugins?.ScreenShare) {
+        window.Capacitor.Plugins.ScreenShare.stop().catch(() => {});
+        if (nativeScreenShareListener) {
+            nativeScreenShareListener.remove();
+            nativeScreenShareListener = null;
+        }
+        if (nativeScreenStoppedListener) {
+            nativeScreenStoppedListener.remove();
+            nativeScreenStoppedListener = null;
+        }
+    }
 
     if (screenStream) {
         screenStream.getTracks().forEach(track => track.stop());
@@ -5619,27 +5744,17 @@ const handleSingleSignal = async (senderUid, signal) => {
         remoteScreenSharing.set(senderUid, true);
         adjustVideoContainerLayout();
         const videoId = `remote-video-${senderUid}`;
-        const videoEl = document.getElementById(videoId);
-        if (videoEl) {
-            const src = videoEl.srcObject;
-            if (src) {
-                videoEl.srcObject = null;
-                videoEl.srcObject = src;
-                videoEl.play().catch(e => console.warn("Play failed on screen share start:", e));
-            }
+        const videoEl = document.getElementById(videoId) || elements.remoteVideo;
+        if (videoEl && videoEl.paused) {
+            videoEl.play().catch(e => console.warn("Play failed on screen share start:", e));
         }
     } else if (signal.status === 'screen-sharing-stopped') {
         remoteScreenSharing.set(senderUid, false);
         adjustVideoContainerLayout();
         const videoId = `remote-video-${senderUid}`;
-        const videoEl = document.getElementById(videoId);
-        if (videoEl) {
-            const src = videoEl.srcObject;
-            if (src) {
-                videoEl.srcObject = null;
-                videoEl.srcObject = src;
-                videoEl.play().catch(e => console.warn("Play failed on screen share stop:", e));
-            }
+        const videoEl = document.getElementById(videoId) || elements.remoteVideo;
+        if (videoEl && videoEl.paused) {
+            videoEl.play().catch(e => console.warn("Play failed on screen share stop:", e));
         }
     } else if (signal.status === 'busy') {
         clearTimeout(callTimeoutId);

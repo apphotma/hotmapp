@@ -21,6 +21,10 @@
     <!-- Push Notification Permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Screen Sharing Foreground Service Permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -127,6 +131,12 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Screen capture foreground service for WebRTC video call screen sharing -->
+        <service
+            android:name=".ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
