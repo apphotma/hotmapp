@@ -6157,12 +6157,43 @@ iframe {
     background: #000;
     z-index: 5;
     display: none;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.remote-videos-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    box-sizing: border-box;
+    z-index: 4;
 }
 
 #remote-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.remote-grid-video {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    background: #111b21;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .remote-mute-overlay {

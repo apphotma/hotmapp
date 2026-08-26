@@ -3795,6 +3795,7 @@ const playRemoteStream = (targetUid, stream, type) => {
 
     // Handle remote video stream
     if (type === 'video' && elements.videoContainer) {
+        const grid = elements.remoteVideosGrid || elements.videoContainer;
         let videoId = `remote-video-${targetUid}`;
         let videoEl = document.getElementById(videoId);
         if (!videoEl) {
@@ -3803,7 +3804,7 @@ const playRemoteStream = (targetUid, stream, type) => {
             videoEl.autoplay = true;
             videoEl.playsInline = true;
             videoEl.className = 'remote-grid-video';
-            elements.videoContainer.insertBefore(videoEl, elements.localVideo);
+            grid.appendChild(videoEl);
         }
         if (videoEl.srcObject !== stream) {
             videoEl.srcObject = stream;
@@ -3827,8 +3828,9 @@ const playRemoteStream = (targetUid, stream, type) => {
 };
 
 const adjustVideoContainerLayout = () => {
-    if (!elements.videoContainer) return;
-    const remoteVideos = elements.videoContainer.querySelectorAll('.remote-grid-video');
+    const grid = elements.remoteVideosGrid || elements.videoContainer;
+    if (!grid || !elements.videoContainer) return;
+    const remoteVideos = grid.querySelectorAll('.remote-grid-video');
     const total = remoteVideos.length;
 
     if (total === 0) {
@@ -3839,45 +3841,56 @@ const adjustVideoContainerLayout = () => {
         return;
     }
 
-    elements.videoContainer.style.display = 'grid';
+    if (elements.remoteVideo) {
+        elements.remoteVideo.style.display = 'none';
+    }
+
+    elements.videoContainer.style.display = 'block';
+    grid.style.display = 'grid';
+
+    const isLandscape = window.innerWidth > window.innerHeight;
+
     if (total === 1) {
-        elements.videoContainer.style.gridTemplateColumns = '1fr';
-        elements.videoContainer.style.gridTemplateRows = '1fr';
-        remoteVideos[0].style.width = '100%';
-        remoteVideos[0].style.height = '100%';
-        
-        const targetUid = remoteVideos[0].id.replace('remote-video-', '');
-        const stream = remoteVideos[0].srcObject;
+        grid.style.gridTemplateColumns = '1fr';
+        grid.style.gridTemplateRows = '1fr';
+        grid.style.gap = '0px';
+        grid.style.padding = '0px';
+    } else if (total === 2) {
+        // Equal 50/50 split
+        if (isLandscape) {
+            grid.style.gridTemplateColumns = '1fr 1fr';
+            grid.style.gridTemplateRows = '1fr';
+        } else {
+            grid.style.gridTemplateColumns = '1fr';
+            grid.style.gridTemplateRows = '1fr 1fr';
+        }
+        grid.style.gap = '8px';
+        grid.style.padding = '8px 8px calc(80px + env(safe-area-inset-bottom, 16px)) 8px';
+    } else {
+        // 3 or 4: Equal 2x2 grid
+        grid.style.gridTemplateColumns = '1fr 1fr';
+        grid.style.gridTemplateRows = '1fr 1fr';
+        grid.style.gap = '8px';
+        grid.style.padding = '8px 8px calc(80px + env(safe-area-inset-bottom, 16px)) 8px';
+    }
+
+    remoteVideos.forEach(v => {
+        v.style.width = '100%';
+        v.style.height = '100%';
+        v.style.minWidth = '0';
+        v.style.minHeight = '0';
+        v.style.display = 'block';
+
+        const targetUid = v.id.replace('remote-video-', '');
+        const stream = v.srcObject;
         const isScreenShare = (remoteScreenSharing.get(targetUid) === true) || (stream && stream.getVideoTracks && stream.getVideoTracks().some(track => {
             const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
             const label = track.label ? track.label.toLowerCase() : '';
             return settings.displaySurface || label.includes('screen') || label.includes('window') || label.includes('monitor');
         }));
-        remoteVideos[0].style.objectFit = isScreenShare ? 'contain' : 'cover';
-        remoteVideos[0].style.background = isScreenShare ? '#000' : '';
-    } else {
-        if (total === 2) {
-            elements.videoContainer.style.gridTemplateColumns = '1fr';
-            elements.videoContainer.style.gridTemplateRows = '1fr 1fr';
-        } else {
-            elements.videoContainer.style.gridTemplateColumns = '1fr 1fr';
-            elements.videoContainer.style.gridTemplateRows = 'auto';
-        }
-        remoteVideos.forEach(v => {
-            v.style.width = '100%';
-            v.style.height = '100%';
-            
-            const targetUid = v.id.replace('remote-video-', '');
-            const stream = v.srcObject;
-            const isScreenShare = (remoteScreenSharing.get(targetUid) === true) || (stream && stream.getVideoTracks && stream.getVideoTracks().some(track => {
-                const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
-                const label = track.label ? track.label.toLowerCase() : '';
-                return settings.displaySurface || label.includes('screen') || label.includes('window') || label.includes('monitor');
-            }));
-            v.style.objectFit = isScreenShare ? 'contain' : 'cover';
-            v.style.background = isScreenShare ? '#000' : '';
-        });
-    }
+        v.style.objectFit = isScreenShare ? 'contain' : 'cover';
+        v.style.background = isScreenShare ? '#000' : '#111b21';
+    });
 };
 
 const cleanupRemoteMedia = (targetUid) => {
@@ -5307,26 +5320,40 @@ const showAddParticipantModal = () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    let itemsHtml = '';
-    const onlineFriends = Object.keys(moduleFriendsList).filter(uid => {
-        const profile = allUsersCache[uid];
-        return profile &&
-            profile.online &&
-            uid !== user.uid &&
-            !peerConnections.has(uid) &&
-            !callParticipants.has(uid);
+    // Build contacts list of all friends/contacts excluding current call participants
+    const allFriendUids = Object.keys(moduleFriendsList || {}).filter(uid => {
+        return uid !== user.uid && !peerConnections.has(uid) && !callParticipants.has(uid);
     });
 
-    if (onlineFriends.length === 0) {
-        itemsHtml = `<div class="add-participant-empty">No online contacts available to invite.</div>`;
-    } else {
-        onlineFriends.forEach(uid => {
+    const renderContacts = (filterText = '') => {
+        const listEl = modal.querySelector('.add-participant-list');
+        if (!listEl) return;
+
+        const lowerFilter = (filterText || '').toLowerCase().trim();
+        const filteredUids = allFriendUids.filter(uid => {
             const profile = allUsersCache[uid];
-            const name = getContactDisplayName(uid, profile) || 'Unknown Contact';
+            const name = (getContactDisplayName(uid, profile) || profile?.fullname || '').toLowerCase();
+            return !lowerFilter || name.includes(lowerFilter);
+        });
+
+        if (filteredUids.length === 0) {
+            listEl.innerHTML = `<div class="add-participant-empty">${lowerFilter ? 'No matching contacts found.' : 'No available contacts to invite.'}</div>`;
+            return;
+        }
+
+        let itemsHtml = '';
+        filteredUids.forEach(uid => {
+            const profile = allUsersCache[uid] || {};
+            const name = getContactDisplayName(uid, profile) || profile.fullname || 'Unknown Contact';
             const initials = name.charAt(0).toUpperCase();
-            const avatarHtml = profile.profilePhoto
+            const avatarHtml = profile.profilePhoto && !profile.profilePhoto.includes('group-info-avatar-img') && !profile.profilePhoto.endsWith('/')
                 ? `<img src="${profile.profilePhoto}" class="add-participant-avatar">`
                 : `<div class="add-participant-avatar">${initials}</div>`;
+
+            const isOnline = profile.online === true;
+            const statusHtml = isOnline
+                ? `<div class="add-participant-status" style="color: #10b981;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Online</div>`
+                : `<div class="add-participant-status" style="color: #94a3b8;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span> Available</div>`;
 
             itemsHtml += `
                 <div class="add-participant-item">
@@ -5334,30 +5361,56 @@ const showAddParticipantModal = () => {
                         ${avatarHtml}
                         <div>
                             <div class="add-participant-name">${name}</div>
-                            <div class="add-participant-status"><span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Online</div>
+                            ${statusHtml}
                         </div>
                     </div>
                     <button class="add-participant-invite-btn" data-uid="${uid}">Invite</button>
                 </div>
             `;
         });
-    }
+        listEl.innerHTML = itemsHtml;
+
+        const inviteBtns = listEl.querySelectorAll('.add-participant-invite-btn');
+        inviteBtns.forEach(btn => {
+            btn.onclick = async () => {
+                const targetUid = btn.getAttribute('data-uid');
+                btn.disabled = true;
+                btn.textContent = 'Inviting...';
+                await inviteParticipantToCall(targetUid);
+                btn.textContent = 'Invited ✓';
+                showToast(`Invitation sent to ${getContactDisplayName(targetUid, allUsersCache[targetUid]) || 'contact'}`);
+                setTimeout(() => {
+                    modal.classList.remove('show');
+                    setTimeout(() => { modal.style.display = 'none'; }, 300);
+                }, 700);
+            };
+        });
+    };
 
     modal.innerHTML = `
         <div class="add-participant-content">
             <div class="add-participant-header">
-                <h3>Add Participant</h3>
+                <h3>Add to Call</h3>
                 <button class="add-participant-close">&times;</button>
             </div>
-            <div class="add-participant-list">
-                ${itemsHtml}
-            </div>
+            <input type="text" class="add-participant-search" placeholder="Search contacts..." style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: #fff; margin-bottom: 12px; font-size: 0.9rem; outline: none;">
+            <div class="add-participant-list"></div>
         </div>
     `;
+
+    renderContacts();
 
     modal.style.display = 'flex';
     modal.offsetHeight;
     modal.classList.add('show');
+
+    const searchInput = modal.querySelector('.add-participant-search');
+    if (searchInput) {
+        searchInput.oninput = (e) => {
+            renderContacts(e.target.value);
+        };
+        setTimeout(() => searchInput.focus(), 100);
+    }
 
     const closeBtn = modal.querySelector('.add-participant-close');
     closeBtn.onclick = () => {
@@ -5365,20 +5418,12 @@ const showAddParticipantModal = () => {
         setTimeout(() => { modal.style.display = 'none'; }, 300);
     };
 
-    const inviteBtns = modal.querySelectorAll('.add-participant-invite-btn');
-    inviteBtns.forEach(btn => {
-        btn.onclick = async () => {
-            const targetUid = btn.getAttribute('data-uid');
-            btn.disabled = true;
-            btn.textContent = 'Invited';
-            await inviteParticipantToCall(targetUid);
-            showToast(`Invitation sent to ${allUsersCache[targetUid]?.fullname || 'contact'}`);
-            setTimeout(() => {
-                modal.classList.remove('show');
-                setTimeout(() => { modal.style.display = 'none'; }, 300);
-            }, 500);
-        };
-    });
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    };
 };
 
 const inviteParticipantToCall = async (targetUid) => {
@@ -5388,26 +5433,36 @@ const inviteParticipantToCall = async (targetUid) => {
     callParticipants.add(targetUid);
     updateCallUI();
 
-    const currentParticipants = [user.uid, ...Array.from(peerConnections.keys())];
     const callerName = elements.headerUserName?.textContent || user.displayName || 'Contact';
 
-    await sendCallSignal(targetUid, user.uid, {
-        status: 'group-invite',
-        from: user.uid,
-        fromName: callerName,
-        callType: currentCallType,
-        participants: currentParticipants
-    });
+    try {
+        const pc = await setupWebRTC(targetUid, true, currentCallType);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
 
-    const notifyPromises = Array.from(peerConnections.keys()).map(pUid => {
-        return sendCallSignal(pUid, user.uid, {
-            status: 'add-participant',
-            participantUid: targetUid,
-            from: user.uid
+        await sendCallSignal(targetUid, user.uid, {
+            status: 'calling',
+            from: user.uid,
+            fromName: callerName,
+            offer: offer.sdp,
+            callType: currentCallType,
+            isGroup: true,
+            participants: Array.from(callParticipants)
         });
-    });
-    if (notifyPromises.length > 0) {
-        await Promise.all(notifyPromises);
+
+        // Broadcast to other existing call participants that targetUid was invited
+        for (const pUid of peerConnections.keys()) {
+            if (pUid !== targetUid) {
+                await sendCallSignal(pUid, user.uid, {
+                    status: 'add-participant',
+                    participantUid: targetUid,
+                    from: user.uid
+                });
+            }
+        }
+    } catch (err) {
+        console.error(`Failed to initiate WebRTC for invited user ${targetUid}:`, err);
+        showToast("Could not send call invite", "error");
     }
 };
 
@@ -5442,6 +5497,12 @@ const handleSingleSignal = async (senderUid, signal) => {
         const isCurrentlyInCall = peerConnections.size > 0;
 
         if (isCurrentlyInCall) {
+            const existingPc = peerConnections.get(senderUid);
+            if (existingPc && existingPc.connectionState === 'connected' && existingPc.signalingState === 'stable') {
+                console.log(`Already connected to ${senderUid}, skipping duplicate calling signal.`);
+                return;
+            }
+
             console.log(`Auto-accepting group connection from ${senderUid}`);
 
             // Detect if remote peer has switched to video call
@@ -5562,6 +5623,44 @@ const handleSingleSignal = async (senderUid, signal) => {
             elements.callStatus.textContent = "Connected";
             if (currentCallType === 'voice' && elements.callVideoBtn) elements.callVideoBtn.style.display = 'flex';
             updateCallUI();
+
+            // Connect to other participants in group mesh
+            if (signal.participants && Array.isArray(signal.participants)) {
+                for (const otherUid of signal.participants) {
+                    if (otherUid !== user.uid && otherUid !== senderUid) {
+                        callParticipants.add(otherUid);
+                        if (user.uid < otherUid) {
+                            // Offerer role: initiate WebRTC offer directly
+                            try {
+                                console.log(`Connecting mesh peer to ${otherUid}`);
+                                const meshPc = await setupWebRTC(otherUid, true, currentCallType);
+                                const offer = await meshPc.createOffer();
+                                await meshPc.setLocalDescription(offer);
+                                await sendCallSignal(otherUid, user.uid, {
+                                    status: 'calling',
+                                    from: user.uid,
+                                    fromName: user.displayName || elements.headerUserName?.textContent || 'Contact',
+                                    offer: offer.sdp,
+                                    callType: currentCallType,
+                                    isGroup: true,
+                                    participants: Array.from(callParticipants)
+                                });
+                            } catch (e) {
+                                console.warn(`Failed to connect mesh peer to ${otherUid}:`, e);
+                            }
+                        } else {
+                            // Answerer role: notify peer to offer
+                            sendCallSignal(otherUid, user.uid, {
+                                status: 'mesh-connect',
+                                from: user.uid,
+                                fromName: user.displayName || elements.headerUserName?.textContent || 'Contact',
+                                callType: currentCallType
+                            }).catch(e => console.warn(`Mesh connect signal failed for ${otherUid}:`, e));
+                        }
+                    }
+                }
+                updateCallUI();
+            }
         };
 
         const onReject = async () => {
@@ -5656,7 +5755,8 @@ const handleSingleSignal = async (senderUid, signal) => {
                     fromName: user.displayName || 'Contact',
                     callType: currentCallType,
                     offer: offer.sdp,
-                    isGroup: true
+                    isGroup: true,
+                    participants: Array.from(callParticipants)
                 });
             }
 
@@ -5696,21 +5796,69 @@ const handleSingleSignal = async (senderUid, signal) => {
         elements.callAcceptBtn.onclick = onAccept;
         elements.callRejectBtn.onclick = onReject;
 
-    } else if (signal.status === 'add-participant') {
-        if (signal.participantUid && signal.participantUid !== user.uid) {
-            callParticipants.add(signal.participantUid);
+    } else if (signal.status === 'mesh-connect') {
+        const otherUid = signal.from;
+        if (otherUid && otherUid !== user.uid) {
+            callParticipants.add(otherUid);
             updateCallUI();
+
+            // Establish direct WebRTC connection with the newly active participant
+            if (!peerConnections.has(otherUid)) {
+                try {
+                    console.log(`Connecting mesh peer to ${otherUid}`);
+                    const pc = await setupWebRTC(otherUid, true, currentCallType);
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    await sendCallSignal(otherUid, user.uid, {
+                        status: 'calling',
+                        from: user.uid,
+                        fromName: user.displayName || elements.headerUserName?.textContent || 'Contact',
+                        offer: offer.sdp,
+                        callType: currentCallType,
+                        isGroup: true,
+                        participants: Array.from(callParticipants)
+                    });
+                } catch (meshErr) {
+                    console.error(`Error connecting to mesh participant ${otherUid}:`, meshErr);
+                }
+            }
+        }
+    } else if (signal.status === 'add-participant') {
+        const newUid = signal.participantUid;
+        if (newUid && newUid !== user.uid) {
+            callParticipants.add(newUid);
+            updateCallUI();
+            if (!peerConnections.has(newUid) && user.uid < newUid) {
+                try {
+                    console.log(`Connecting mesh peer to ${newUid}`);
+                    const pc = await setupWebRTC(newUid, true, currentCallType);
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    await sendCallSignal(newUid, user.uid, {
+                        status: 'calling',
+                        from: user.uid,
+                        fromName: user.displayName || elements.headerUserName?.textContent || 'Contact',
+                        offer: offer.sdp,
+                        callType: currentCallType,
+                        isGroup: true,
+                        participants: Array.from(callParticipants)
+                    });
+                } catch (meshErr) {
+                    console.error(`Error connecting to new participant ${newUid}:`, meshErr);
+                }
+            }
         }
     } else if (signal.status === 'accepted' && signal.answer) {
         const pc = peerConnections.get(senderUid);
-        if (pc && pc.signalingState === 'have-local-offer' && !isSettingRemoteDescription) {
+        if (pc) {
             clearTimeout(callTimeoutId);
             stopRingAudio();
             if (elements.callOverlayPulse) elements.callOverlayPulse.style.display = 'none';
             try {
-                isSettingRemoteDescription = true;
-                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.answer }));
-                processCandidatesQueue(senderUid);
+                if (pc.signalingState === 'have-local-offer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.answer }));
+                    processCandidatesQueue(senderUid);
+                }
                 elements.callStatus.textContent = "Connected";
                 if (!callStartTime) startCallTimer();
                 if (currentCallType === 'video') {
@@ -5720,8 +5868,6 @@ const handleSingleSignal = async (senderUid, signal) => {
                 }
             } catch (err) {
                 console.error(`Error setting remote answer description for ${senderUid}:`, err);
-            } finally {
-                isSettingRemoteDescription = false;
             }
         }
     } else if (signal.status === 'accepted') {
@@ -10644,12 +10790,23 @@ export const initChatSelection = () => {
     elements.callFlashBtn?.addEventListener('click', toggleFlash);
     elements.callRetryBtn?.addEventListener('click', retryCallHandshake);
     elements.callMuteBtn?.addEventListener('click', toggleCallMute);
-    elements.callAddUserBtn?.addEventListener('click', showAddParticipantModal);
-    // Delegate screen share click handling to option container level to support larger touch targets and prevent race conditions
+    elements.callAddUserBtn?.addEventListener('click', () => {
+        closeCallMoreSheet();
+        showAddParticipantModal();
+    });
+    // Delegate screen share & add user click handling to option container level
     document.addEventListener('click', (e) => {
-        const item = e.target.closest('[data-option="screen-share"]');
-        if (item) {
+        const screenShareItem = e.target.closest('[data-option="screen-share"]');
+        if (screenShareItem) {
             toggleScreenSharing();
+            return;
+        }
+
+        const addUserItem = e.target.closest('[data-option="add-user"]');
+        if (addUserItem) {
+            closeCallMoreSheet();
+            showAddParticipantModal();
+            return;
         }
     });
 

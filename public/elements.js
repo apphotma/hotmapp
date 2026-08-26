@@ -435,6 +435,9 @@ export const elements = {
     get videoContainer() {
         return document.querySelector('[data-ui="video-container"]');
     },
+    get remoteVideosGrid() {
+        return document.querySelector('[data-ui="remote-videos-grid"]') || document.querySelector('[data-ui="video-container"]');
+    },
     get localVideo() {
         return document.querySelector('[data-ui="local-video"]');
     },
