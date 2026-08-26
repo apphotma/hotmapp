@@ -1040,6 +1040,48 @@ export const getAllUsers = async () => {
  */
 export const getUserProfile = async (userId) => {
     let cached = await getCachedItem('profiles', userId);
+    
+    // Start background revalidation to ensure the local profile cache doesn't stay stale forever
+    const revalidatePromise = (async () => {
+        try {
+            const dbRef = ref(db);
+            const snapshot = await get(child(dbRef, `publicProfiles/${userId}`));
+            if (snapshot.exists()) {
+                const val = snapshot.val();
+                
+                // Auto-heal/migrate missing createdAt
+                if (val && !val.createdAt) {
+                    try {
+                        const userSnapshot = await get(child(dbRef, `users/${userId}/createdAt`));
+                        if (userSnapshot.exists() && userSnapshot.val()) {
+                            val.createdAt = userSnapshot.val();
+                            await set(ref(db, `publicProfiles/${userId}/createdAt`), val.createdAt);
+                        } else {
+                            val.createdAt = Date.now();
+                            await set(ref(db, `users/${userId}/createdAt`), val.createdAt);
+                            await set(ref(db, `publicProfiles/${userId}/createdAt`), val.createdAt);
+                        }
+                    } catch (e) {
+                        console.warn("Could not auto-heal public profile createdAt for user:", userId, e);
+                    }
+                }
+
+                const profile = { uid: userId, ...val };
+                await cacheItem('profiles', profile);
+                
+                const isDifferent = !cached || JSON.stringify(cached) !== JSON.stringify(profile);
+                if (isDifferent) {
+                    localAllUsersCache[userId] = profile;
+                    notifyAllUsersCallbacks();
+                }
+                return profile;
+            }
+        } catch (err) {
+            console.error("Error revalidating profile for user:", userId, err);
+        }
+        return null;
+    })();
+
     if (cached && cached.createdAt) {
         if (userId && !localAllUsersCache[userId]) {
             localAllUsersCache[userId] = cached;
@@ -1047,38 +1089,8 @@ export const getUserProfile = async (userId) => {
         }
         return cached;
     }
-    const dbRef = ref(db);
-    const snapshot = await get(child(dbRef, `publicProfiles/${userId}`));
-    if (snapshot.exists()) {
-        const val = snapshot.val();
-        
-        // Auto-heal/migrate missing createdAt
-        if (val && !val.createdAt) {
-            try {
-                const userSnapshot = await get(child(dbRef, `users/${userId}/createdAt`));
-                if (userSnapshot.exists() && userSnapshot.val()) {
-                    val.createdAt = userSnapshot.val();
-                    await set(ref(db, `publicProfiles/${userId}/createdAt`), val.createdAt);
-                } else {
-                    // Fallback to current timestamp if missing everywhere
-                    val.createdAt = Date.now();
-                    await set(ref(db, `users/${userId}/createdAt`), val.createdAt);
-                    await set(ref(db, `publicProfiles/${userId}/createdAt`), val.createdAt);
-                }
-            } catch (e) {
-                console.warn("Could not auto-heal public profile createdAt for user:", userId, e);
-            }
-        }
 
-        const profile = { uid: userId, ...val };
-        await cacheItem('profiles', profile);
-        localAllUsersCache[userId] = profile;
-        notifyAllUsersCallbacks();
-        return profile;
-    } else {
-        console.warn("No profile data found for user:", userId);
-        return null;
-    }
+    return await revalidatePromise;
 };
 
 export const getUserIdByPhoneNumber = async (phoneNumber) => {
@@ -1214,23 +1226,48 @@ export const getProductsPage = async (lastKey = null, limit = 20) => {
  * Fetches products in a specific category
  */
 export const getProductsByCategory = async (category) => {
-    const productsQuery = query(
-        ref(db, 'products'),
-        orderByChild('category'),
-        equalTo(category)
-    );
-    const snapshot = await get(productsQuery);
-    if (snapshot.exists()) {
-        const val = snapshot.val();
-        for (const key in val) {
-            await cacheItem('products', val[key]);
-            if (val[key].ownerId) {
-                requestUserProfile(val[key].ownerId);
+    const dbRef = ref(db);
+    const snapshot = await get(child(dbRef, 'products'));
+    if (!snapshot.exists()) return {};
+
+    const allProducts = snapshot.val();
+    const matchedProducts = {};
+
+    for (const key in allProducts) {
+        const product = allProducts[key];
+        const prodCat = product.category || '';
+
+        // Check product category
+        let matches = prodCat.toLowerCase() === category.toLowerCase();
+
+        // Check seller's business category
+        if (!matches && product.ownerId) {
+            const sellerProfile = localAllUsersCache[product.ownerId] || {};
+            const bizProfile = sellerProfile.businessProfile || {};
+            const bizCat = bizProfile.category || '';
+            if (bizCat) {
+                const sellerCategories = bizCat.split(', ').map(s => s.trim().toLowerCase());
+                if (sellerCategories.includes(category.toLowerCase())) {
+                    matches = true;
+                }
             }
         }
-        return val;
+
+        if (matches) {
+            matchedProducts[key] = product;
+        }
     }
-    return {};
+
+    // Cache results and fetch profiles
+    for (const key in matchedProducts) {
+        const product = matchedProducts[key];
+        await cacheItem('products', product);
+        if (product.ownerId) {
+            requestUserProfile(product.ownerId);
+        }
+    }
+
+    return matchedProducts;
 };
 
 // Helper for Bigram Jaccard fuzzy string similarity
@@ -1534,6 +1571,17 @@ export const saveBusinessProfile = async (userId, businessData) => {
         set(publicBusinessRef, data)
     ]);
     await cacheItem('shops', { userId, ...businessData });
+
+    // Also update profiles cache to prevent stale businessProfile data
+    try {
+        const cachedProfile = await getCachedItem('profiles', userId);
+        if (cachedProfile) {
+            cachedProfile.businessProfile = { ...businessData, updatedAt: new Date().toISOString() };
+            await cacheItem('profiles', cachedProfile);
+        }
+    } catch (e) {
+        console.warn("Failed to update profiles cache during saveBusinessProfile:", e);
+    }
 };
 
 /**
@@ -1543,62 +1591,70 @@ export const getBusinessProfile = async (userId, { skipCache = false } = {}) => 
     let cachedShop = null;
     if (!skipCache) {
         cachedShop = await getCachedItem('shops', userId);
-        if (cachedShop) {
-            return cachedShop;
-        }
     }
 
     const isSelf = auth.currentUser && userId === auth.currentUser.uid;
-    if (isSelf) {
-        const dbRef = ref(db);
-        const snapshot = await get(child(dbRef, `users/${userId}`));
-        if (snapshot.exists()) {
-            const profile = snapshot.val();
-            // Apply theme from profile on load
-            if (profile.theme) { 
-                let themeToApply = profile.theme;
-                if (themeToApply === 'system') {
-                    themeToApply = 'light';
+
+    const revalidatePromise = (async () => {
+        if (isSelf) {
+            try {
+                const dbRef = ref(db);
+                const snapshot = await get(child(dbRef, `users/${userId}`));
+                if (snapshot.exists()) {
+                    const profile = snapshot.val();
+                    if (profile.theme) { 
+                        let themeToApply = profile.theme;
+                        if (themeToApply === 'system') {
+                            themeToApply = 'light';
+                        }
+
+                        document.body.classList.remove('dark-theme', 'oled-theme');
+                        if (themeToApply === 'dark') document.body.classList.add('dark-theme');
+                        else if (themeToApply === 'oled') document.body.classList.add('oled-theme');
+                    }
+                    const biz = profile.businessProfile || null;
+                    if (biz) {
+                        await cacheItem('shops', { userId, ...biz });
+                    }
+                    return biz;
                 }
-
-                document.body.classList.remove('dark-theme', 'oled-theme');
-                if (themeToApply === 'dark') document.body.classList.add('dark-theme');
-                else if (themeToApply === 'oled') document.body.classList.add('oled-theme');
+            } catch (err) {
+                console.warn("Failed to read self profile for business check:", err);
             }
-            const biz = profile.businessProfile || null;
-            if (biz) {
-                await cacheItem('shops', { userId, ...biz });
-            }
-            return biz;
         }
-    }
 
-    try {
-        const snapshot = await get(ref(db, `publicProfiles/${userId}/businessProfile`));
-        if (snapshot.exists()) {
-            const biz = snapshot.val();
-            await cacheItem('shops', { userId, ...biz });
-            return biz;
-        }
-    } catch (error) {
-        console.warn("Failed to read seller business profile from public profile node:", error);
-    }
-
-    // Safe fallback for older cached or self-scope reads when the public copy is temporarily missing.
-    if (isSelf) {
         try {
-            const snapshot = await get(ref(db, `users/${userId}/businessProfile`));
+            const snapshot = await get(ref(db, `publicProfiles/${userId}/businessProfile`));
             if (snapshot.exists()) {
                 const biz = snapshot.val();
                 await cacheItem('shops', { userId, ...biz });
                 return biz;
             }
         } catch (error) {
-            console.warn("Failed to read self business profile from private profile node:", error);
+            console.warn("Failed to read seller business profile from public profile node:", error);
         }
+
+        // Safe fallback for older cached or self-scope reads when the public copy is temporarily missing.
+        if (isSelf) {
+            try {
+                const snapshot = await get(ref(db, `users/${userId}/businessProfile`));
+                if (snapshot.exists()) {
+                    const biz = snapshot.val();
+                    await cacheItem('shops', { userId, ...biz });
+                    return biz;
+                }
+            } catch (error) {
+                console.warn("Failed to read self business profile from private profile node:", error);
+            }
+        }
+        return null;
+    })();
+
+    if (cachedShop && !skipCache) {
+        return cachedShop;
     }
 
-    return null;
+    return await revalidatePromise;
 };
 
 /**
@@ -2041,16 +2097,31 @@ export const updateOrder = async (orderId, updates) => {
  */
 export const getOrder = async (orderId) => {
     let cached = await getCachedItem('orders', orderId);
+
+    // Start background revalidation to ensure the order details cache doesn't stay stale forever
+    const revalidatePromise = (async () => {
+        try {
+            const orderRef = ref(db, `orders/${orderId}`);
+            const snapshot = await get(orderRef);
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                await cacheItem('orders', data);
+
+                const isDifferent = !cached || JSON.stringify(cached) !== JSON.stringify(data);
+                if (isDifferent) {
+                    window.dispatchEvent(new CustomEvent('order-updated', { detail: data }));
+                }
+                return data;
+            }
+        } catch (err) {
+            console.error("Error revalidating order:", orderId, err);
+        }
+        return null;
+    })();
+
     if (cached) return cached;
 
-    const orderRef = ref(db, `orders/${orderId}`);
-    const snapshot = await get(orderRef);
-    if (snapshot.exists()) {
-        const data = snapshot.val();
-        await cacheItem('orders', data);
-        return data;
-    }
-    return null;
+    return await revalidatePromise;
 };
 
 /**

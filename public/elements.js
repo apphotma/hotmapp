@@ -2518,5 +2518,26 @@ export const elements = {
     },
     get settingsHelpFeedbackBtn() {
         return document.querySelector('[data-ui="settings-help-feedback-btn"]');
+    },
+    get forceUpdateModal() {
+        return document.querySelector('[data-ui="force-update-modal"]');
+    },
+    get updateModalTitle() {
+        return document.querySelector('[data-ui="update-modal-title"]');
+    },
+    get updateModalMessage() {
+        return document.querySelector('[data-ui="update-modal-message"]');
+    },
+    get updateCurrentVer() {
+        return document.querySelector('[data-ui="update-current-ver"]');
+    },
+    get updateLatestVer() {
+        return document.querySelector('[data-ui="update-latest-ver"]');
+    },
+    get updateReleaseNotes() {
+        return document.querySelector('[data-ui="update-release-notes"]');
+    },
+    get updateNowBtn() {
+        return document.querySelector('[data-ui="update-now-btn"]');
     }
 };

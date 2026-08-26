@@ -1894,28 +1894,87 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="business-category">Business Category <span class="required-indicator"
-                                title="Required">*</span></label>
-                        <select id="business-category" name="businessCategory" required data-ui="business-category">
-                            <option value="">Select Category</option>
-                            <option value="Agriculture and Farming">🌾 Agriculture and Farming</option>
-                            <option value="Animals and Pets">🐾 Animals and Pets</option>
-                            <option value="Beauty and Personal Care">💅 Beauty and Personal Care</option>
-                            <option value="Commercial Equipment and Tools">🛠️ Commercial Equipment and Tools</option>
-                            <option value="Electronics">💻 Electronics</option>
-                            <option value="Fashion">👗 Fashion</option>
-                            <option value="Grocery">🛒 Grocery</option>
-                            <option value="Home Furniture and Appliances">🛋️ Home Furniture and Appliances</option>
-                            <option value="Pharmacy">💊 Pharmacy</option>
-                            <option value="Phone">📱 Phone</option>
-                            <option value="Property">🏠 Property</option>
-                            <option value="Repair and Construction">🔨 Repair and Construction</option>
-                            <option value="Restaurant">🍔 Restaurant</option>
-                            <option value="Service">💼 Service</option>
-                            <option value="Vehicles">🚗 Vehicles</option>
-                            <option value="Other">✨ Other</option>
-                        </select>
+                        <label>Business Category <span class="required-indicator" title="Required">*</span></label>
+                        <input type="hidden" name="businessCategory" required data-ui="business-category" value="">
+                        <div class="business-category-checkboxes" data-ui="business-category-checkboxes">
+                            <div class="category-selection-count" style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected: <span class="selected-count-val">0</span> / 3</div>
+                            <div class="category-checkbox-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Agriculture and Farming"> 🌾 Agriculture and Farming
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Animals and Pets"> 🐾 Animals and Pets
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Beauty and Personal Care"> 💅 Beauty and Personal Care
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and Tools
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Electronics"> 💻 Electronics
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Fashion"> 👗 Fashion
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Grocery"> 🛒 Grocery
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Pharmacy"> 💊 Pharmacy
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Phone"> 📱 Phone
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Property"> 🏠 Property
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Repair and Construction"> 🔨 Repair and Construction
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant"> 🍔 Restaurant
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Service"> 💼 Service
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Vehicles"> 🚗 Vehicles
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Other"> ✨ Other
+                                </label>
+                            </div>
+                            <input type="text" placeholder="Specify custom category..." class="store-search-input" data-ui="custom-category-input" style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
+                        </div>
                         <div class="error-msg" data-ui="business-category-error"></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>Store Currency</label>
+                        <div class="field-hint"
+                            style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                            Select the primary currency for product prices, delivery charges, and customer checkout.</div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select name="storeCurrency" data-ui="store-currency" style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
+                                <option value="$">$ (USD / Dollar)</option>
+                                <option value="€">€ (EUR / Euro)</option>
+                                <option value="£">£ (GBP / British Pound)</option>
+                                <option value="₦">₦ (NGN / Nigerian Naira)</option>
+                                <option value="¥">¥ (JPY / Yuan / Yen)</option>
+                                <option value="AED">AED (UAE Dirham)</option>
+                                <option value="₹">₹ (INR / Indian Rupee)</option>
+                                <option value="CAD">CAD (Canadian Dollar)</option>
+                                <option value="AUD">AUD (Australian Dollar)</option>
+                                <option value="KES">KES (Kenyan Shilling)</option>
+                                <option value="ZAR">ZAR (South African Rand)</option>
+                                <option value="GHS">GHS (Ghanaian Cedi)</option>
+                                <option value="custom">Other / Custom Symbol...</option>
+                            </select>
+                            <input type="text" data-ui="custom-store-currency" name="customStoreCurrency" placeholder="e.g. CHF" style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;" maxlength="6">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Business Logo (Optional)</label>
@@ -1961,16 +2020,76 @@
                     <div data-ui="delivery-coverage-section" style="display: none;">
                         <h5>Delivery Coverage</h5>
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="delivery-fee">Standard Delivery Fee</label>
+                            <label for="delivery-fee">Standard Delivery Fee (<span class="delivery-currency-sym">$</span>)</label>
                             <input type="number" name="deliveryFee" step="0.01" min="0" data-ui="delivery-fee"
                                 placeholder="0.00">
                             <div class="error-msg" data-ui="delivery-fee-error"></div>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="min-free-delivery">Min Order for Free Delivery</label>
+                            <label for="min-free-delivery">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
                             <input type="number" name="minFreeDelivery" step="0.01" min="0" data-ui="min-free-delivery"
                                 placeholder="Leave empty for no limit">
                             <div class="error-msg" data-ui="min-free-delivery-error"></div>
+                        </div>
+
+                        <!-- Distance-Based Delivery Tiers UI -->
+                        <div class="form-group" style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <input type="checkbox" id="reg-use-delivery-tiers" data-ui="use-delivery-tiers" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                                <label for="reg-use-delivery-tiers" style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based Delivery Fees</label>
+                            </div>
+                            
+                            <!-- Tiers config list (visible when checked) -->
+                            <div data-ui="delivery-tiers-config" style="display: none;">
+                                <div style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
+                                    <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">
+                                        <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How Distance-Based Pricing Works:
+                                    </div>
+                                    <ul style="margin: 0; padding-left: 18px; font-size: 0.76rem; color: #4b5563;">
+                                        <li><strong>Max Distance (km):</strong> Straight-line radius in <strong>kilometers (km)</strong> from your store (e.g. <code>5</code> means up to 5 km).</li>
+                                        <li><strong>Delivery Fee (<span class="delivery-currency-sym">$</span>):</strong> The shipping charge for orders delivered within this kilometer range.</li>
+                                        <li><strong>Free Order Min (<span class="delivery-currency-sym">$</span>):</strong> <em>(Optional)</em> If customer purchase amount reaches this amount or higher, delivery is <strong>FREE</strong> for this distance.</li>
+                                    </ul>
+                                </div>
+
+                                <!-- Column Headers for Tiers -->
+                                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
+                                    <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                        Distance <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up to km)</span>
+                                    </div>
+                                    <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                        Delivery Fee <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span class="delivery-currency-sym">$</span>)</span>
+                                    </div>
+                                    <div style="flex: 1.5; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                        Free Order Min <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional <span class="delivery-currency-sym">$</span>)</span>
+                                    </div>
+                                    <div style="width: 28px;"></div>
+                                </div>
+
+                                <div data-ui="delivery-tiers-list" style="margin-bottom: 10px;">
+                                    <!-- Dynamic rows added here -->
+                                </div>
+                                <button type="button" class="auth-submit-btn" data-ui="add-delivery-tier-btn"
+                                    style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+ Add Distance Tier</button>
+                                
+                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+                                
+                                <!-- Fallback Setting (Deliver all over) -->
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                    <input type="checkbox" id="reg-allow-fallback" data-ui="allow-fallback" style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
+                                    <label for="reg-allow-fallback" style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over (allow delivery beyond maximum tier distance)</label>
+                                </div>
+                                <div data-ui="fallback-inputs" style="display: none; padding-left: 24px; gap: 15px;">
+                                    <div style="flex: 1; margin-bottom: 10px;">
+                                        <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers (<span class="delivery-currency-sym">$</span>)</label>
+                                        <input type="number" step="0.01" min="0" data-ui="fallback-fee" placeholder="0.00" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                    </div>
+                                    <div style="flex: 1; margin-bottom: 10px;">
+                                        <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
+                                        <input type="number" step="0.01" min="0" data-ui="fallback-min-free" placeholder="Leave empty for no limit" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label>Where do you deliver?</label>
@@ -2162,6 +2281,36 @@
         </div>
     </div>
 
+    <!-- App Force Update Modal (Non-dismissible) -->
+    <div class="modal-overlay force-update-overlay" data-ui="force-update-modal"
+        style="display: none; z-index: 99999; backdrop-filter: blur(8px); background: rgba(0, 0, 0, 0.85);">
+        <div class="modal-content auth-card force-update-card"
+            style="max-width: 420px; text-align: center; padding: 32px 24px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid var(--border); background: var(--panel);">
+            <div style="width: 76px; height: 76px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; border: 2px solid rgba(0, 168, 132, 0.3);">
+                <i class="fa-solid fa-cloud-arrow-down" style="font-size: 2.2rem; color: var(--brand);"></i>
+            </div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text); margin-bottom: 8px;" data-ui="update-modal-title">Update Required</h2>
+            <p style="font-size: 0.92rem; color: var(--muted); line-height: 1.5; margin-bottom: 20px;" data-ui="update-modal-message">
+                A new version of HOTMAPP is available. Please update to continue using all features.
+            </p>
+
+            <div style="background: var(--panel-soft); border-radius: 12px; padding: 12px 16px; margin-bottom: 22px; font-size: 0.84rem; text-align: left; border: 1px solid var(--border);" data-ui="update-notes-container">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600;">
+                    <span style="color: var(--muted);">Your Version: <strong data-ui="update-current-ver" style="color: var(--text);">v1.0.1</strong></span>
+                    <span style="color: var(--brand);">Latest: <strong data-ui="update-latest-ver">v1.0.1</strong></span>
+                </div>
+                <div style="color: var(--muted); font-size: 0.8rem; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 6px;" data-ui="update-release-notes">
+                    Includes new improvements, performance optimizations, and bug fixes.
+                </div>
+            </div>
+
+            <a href="https://play.google.com/store/apps/details?id=com.hotmapp.app" target="_blank" class="auth-submit-btn" data-ui="update-now-btn"
+                style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 1.05rem; padding: 14px; border-radius: 12px; background: var(--brand); color: white; box-shadow: 0 4px 14px rgba(0, 168, 132, 0.35); cursor: pointer;">
+                <i class="fa-solid fa-download"></i> Update Now
+            </a>
+        </div>
+    </div>
+
     <!-- Location Picker Modal (reused from chat.js, but for business registration) -->
     <div class="location-modal modal-overlay" data-ui="business-location-picker-modal"
         style="display: none; z-index: 5040;">
@@ -2276,6 +2425,20 @@
                 </div>
             </div>
         </header>
+
+        <!-- Minimized Call Bar -->
+        <div class="minimized-call-bar" data-ui="minimized-call-bar" style="display: none;">
+            <div class="minimized-info">
+                <i class="fa-solid fa-phone"></i>
+                <span data-ui="minimized-call-name">Contact Name</span>
+                <span class="minimized-timer" data-ui="minimized-call-timer">00:00</span>
+            </div>
+            <div class="minimized-actions">
+                <button class="min-action-btn" data-ui="min-mute-btn"><i class="fa-solid fa-microphone"></i></button>
+                <button class="min-action-btn end" data-ui="min-end-btn"><i
+                        class="fa-solid fa-phone-slash"></i></button>
+            </div>
+        </div>
 
         <!-- Main Container -->
         <div class="container chat-container" data-ui="chat-container">
@@ -2885,29 +3048,87 @@
                                 <label>Business Category</label>
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
-                                    Select the main category that best represents the products you sell.</div>
-                                <select name="businessCategory" required data-ui="business-category">
-                                    <option value="">Select Category</option>
-                                    <option value="Agriculture and Farming">🌾 Agriculture and Farming</option>
-                                    <option value="Animals and Pets">🐾 Animals and Pets</option>
-                                    <option value="Beauty and Personal Care">💅 Beauty and Personal Care</option>
-                                    <option value="Commercial Equipment and Tools">🛠️ Commercial Equipment and Tools
-                                    </option>
-                                    <option value="Electronics">💻 Electronics</option>
-                                    <option value="Fashion">👗 Fashion</option>
-                                    <option value="Grocery">🛒 Grocery</option>
-                                    <option value="Home Furniture and Appliances">🛋️ Home Furniture and Appliances
-                                    </option>
-                                    <option value="Pharmacy">💊 Pharmacy</option>
-                                    <option value="Phone">📱 Phone</option>
-                                    <option value="Property">🏠 Property</option>
-                                    <option value="Repair and Construction">🔨 Repair and Construction</option>
-                                    <option value="Restaurant">🍔 Restaurant</option>
-                                    <option value="Service">💼 Service</option>
-                                    <option value="Vehicles">🚗 Vehicles</option>
-                                    <option value="Other">✨ Other</option>
-                                </select>
+                                    Select up to 3 categories that best represent the products you sell.</div>
+                                <input type="hidden" name="businessCategory" required data-ui="business-category" value="">
+                                <div class="business-category-checkboxes" data-ui="business-category-checkboxes">
+                                    <div class="category-selection-count" style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected: <span class="selected-count-val">0</span> / 3</div>
+                                    <div class="category-checkbox-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Agriculture and Farming"> 🌾 Agriculture and Farming
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Animals and Pets"> 🐾 Animals and Pets
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Beauty and Personal Care"> 💅 Beauty and Personal Care
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and Tools
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Electronics"> 💻 Electronics
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Fashion"> 👗 Fashion
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Grocery"> 🛒 Grocery
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Pharmacy"> 💊 Pharmacy
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Phone"> 📱 Phone
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Property"> 🏠 Property
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Repair and Construction"> 🔨 Repair and Construction
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant"> 🍔 Restaurant
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Service"> 💼 Service
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Vehicles"> 🚗 Vehicles
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Other"> ✨ Other
+                                        </label>
+                                    </div>
+                                    <input type="text" placeholder="Specify custom category..." class="store-search-input" data-ui="custom-category-input" style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
+                                </div>
                                 <div class="error-msg" data-ui="business-category-error"></div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 20px;">
+                                <label>Store Currency</label>
+                                <div class="field-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
+                                    Select the primary currency for product prices, delivery charges, and customer checkout.</div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <select name="storeCurrency" data-ui="store-currency" style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
+                                        <option value="$">$ (USD / Dollar)</option>
+                                        <option value="€">€ (EUR / Euro)</option>
+                                        <option value="£">£ (GBP / British Pound)</option>
+                                        <option value="₦">₦ (NGN / Nigerian Naira)</option>
+                                        <option value="¥">¥ (JPY / Yuan / Yen)</option>
+                                        <option value="AED">AED (UAE Dirham)</option>
+                                        <option value="₹">₹ (INR / Indian Rupee)</option>
+                                        <option value="CAD">CAD (Canadian Dollar)</option>
+                                        <option value="AUD">AUD (Australian Dollar)</option>
+                                        <option value="KES">KES (Kenyan Shilling)</option>
+                                        <option value="ZAR">ZAR (South African Rand)</option>
+                                        <option value="GHS">GHS (Ghanaian Cedi)</option>
+                                        <option value="custom">Other / Custom Symbol...</option>
+                                    </select>
+                                    <input type="text" data-ui="custom-store-currency" name="customStoreCurrency" placeholder="e.g. CHF" style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;" maxlength="6">
+                                </div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Business Logo (Optional)</label>
@@ -2952,7 +3173,7 @@
                         <div data-ui="delivery-coverage-section" style="display: none; margin-bottom: 30px;">
                             <h4 style="margin-bottom: 10px;">Delivery Coverage</h4>
                             <div class="form-group" style="margin-bottom: 20px;">
-                                <label>Standard Delivery Fee</label>
+                                <label>Standard Delivery Fee (<span class="delivery-currency-sym">$</span>)</label>
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
                                     Enter the baseline amount charged for delivering orders to customers.</div>
@@ -2961,7 +3182,7 @@
                                 <div class="error-msg" data-ui="delivery-fee-error"></div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
-                                <label>Min Order for Free Delivery</label>
+                                <label>Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
                                     Minimum order total to get free delivery. Leave blank for no free delivery.</div>
@@ -2969,6 +3190,67 @@
                                     data-ui="min-free-delivery" placeholder="Leave empty for no limit">
                                 <div class="error-msg" data-ui="min-free-delivery-error"></div>
                             </div>
+
+                            <!-- Distance-Based Delivery Tiers UI -->
+                            <div class="form-group" style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                    <input type="checkbox" id="edit-use-delivery-tiers" data-ui="use-delivery-tiers" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                                    <label for="edit-use-delivery-tiers" style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based Delivery Fees</label>
+                                </div>
+                                
+                                <!-- Tiers config list (visible when checked) -->
+                                <div data-ui="delivery-tiers-config" style="display: none;">
+                                    <div style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
+                                        <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">
+                                            <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How Distance-Based Pricing Works:
+                                        </div>
+                                        <ul style="margin: 0; padding-left: 18px; font-size: 0.76rem; color: #4b5563;">
+                                            <li><strong>Max Distance (km):</strong> Straight-line radius in <strong>kilometers (km)</strong> from your store (e.g. <code>5</code> means up to 5 km).</li>
+                                            <li><strong>Delivery Fee (<span class="delivery-currency-sym">$</span>):</strong> The shipping charge for orders delivered within this kilometer range.</li>
+                                            <li><strong>Free Order Min (<span class="delivery-currency-sym">$</span>):</strong> <em>(Optional)</em> If customer purchase amount reaches this amount or higher, delivery is <strong>FREE</strong> for this distance.</li>
+                                        </ul>
+                                    </div>
+
+                                    <!-- Column Headers for Tiers -->
+                                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
+                                        <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                            Distance <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up to km)</span>
+                                        </div>
+                                        <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                            Delivery Fee <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span class="delivery-currency-sym">$</span>)</span>
+                                        </div>
+                                        <div style="flex: 1.5; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                            Free Order Min <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional <span class="delivery-currency-sym">$</span>)</span>
+                                        </div>
+                                        <div style="width: 28px;"></div>
+                                    </div>
+
+                                    <div data-ui="delivery-tiers-list" style="margin-bottom: 10px;">
+                                        <!-- Dynamic rows added here -->
+                                    </div>
+                                    <button type="button" class="auth-submit-btn" data-ui="add-delivery-tier-btn"
+                                        style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+ Add Distance Tier</button>
+                                    
+                                    <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+                                    
+                                    <!-- Fallback Setting (Deliver all over) -->
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                        <input type="checkbox" id="edit-allow-fallback" data-ui="allow-fallback" style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
+                                        <label for="edit-allow-fallback" style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over (allow delivery beyond maximum tier distance)</label>
+                                    </div>
+                                    <div data-ui="fallback-inputs" style="display: none; padding-left: 24px; gap: 15px;">
+                                        <div style="flex: 1; margin-bottom: 10px;">
+                                            <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers (<span class="delivery-currency-sym">$</span>)</label>
+                                            <input type="number" step="0.01" min="0" data-ui="fallback-fee" placeholder="0.00" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                        </div>
+                                        <div style="flex: 1; margin-bottom: 10px;">
+                                            <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
+                                            <input type="number" step="0.01" min="0" data-ui="fallback-min-free" placeholder="Leave empty for no limit" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Where do you deliver?</label>
                                 <div class="field-hint"
@@ -3230,7 +3512,7 @@
                                     <button type="button" class="custom-select-trigger"
                                         data-ui="market-category-mobile-trigger"
                                         style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; padding: 0 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; width: 100%; justify-content: space-between; font-weight: 500;">
-                                        <span>🔍 All Categories</span>
+                                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍 All Categories</span>
                                         <i class="fa-solid fa-chevron-down"
                                             style="font-size: 0.75rem; color: var(--muted); margin-left: 8px;"></i>
                                     </button>
@@ -3274,8 +3556,8 @@
                                 style="width: auto; display: inline-block; vertical-align: middle;">
                                 <button type="button" class="custom-select-trigger"
                                     data-ui="general-market-category-trigger"
-                                    style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; padding: 0 12px; border: 1px solid var(--border); background: white; cursor: pointer; min-width: 170px; justify-content: space-between; font-weight: 500; color: var(--text);">
-                                    <span>🔍 All Categories</span>
+                                    style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; padding: 0 12px; border: 1px solid var(--border); background: white; cursor: pointer; min-width: 170px; max-width: 250px; justify-content: space-between; font-weight: 500; color: var(--text);">
+                                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍 All Categories</span>
                                     <i class="fa-solid fa-chevron-down"
                                         style="font-size: 0.75rem; color: var(--muted); margin-left: 8px;"></i>
                                 </button>
@@ -3401,20 +3683,6 @@
             </div>
         </div>
 
-        <!-- Minimized Call Bar -->
-        <div class="minimized-call-bar" data-ui="minimized-call-bar" style="display: none;">
-            <div class="minimized-info">
-                <i class="fa-solid fa-phone"></i>
-                <span data-ui="minimized-call-name">Contact Name</span>
-                <span class="minimized-timer" data-ui="minimized-call-timer">00:00</span>
-            </div>
-            <div class="minimized-actions">
-                <button class="min-action-btn" data-ui="min-mute-btn"><i class="fa-solid fa-microphone"></i></button>
-                <button class="min-action-btn end" data-ui="min-end-btn"><i
-                        class="fa-solid fa-phone-slash"></i></button>
-            </div>
-        </div>
-
         <!-- Voice Call Overlay -->
         <div class="call-overlay" data-ui="call-overlay" style="display: none;">
             <button class="minimize-call-btn" data-ui="minimize-call-btn" title="Minimize">
@@ -3455,7 +3723,7 @@
                 </div>
                 <div class="call-controls">
                     <button class="call-btn mute" data-ui="call-mute-btn" title="Mute"><i
-                            class="fa-solid fa-microphone-slash"></i></button>
+                            class="fa-solid fa-microphone"></i></button>
                     <button class="call-btn cam-mute" data-ui="call-cam-mute-btn" title="Mute Camera"
                         style="display: none;"><i class="fa-solid fa-video"></i></button>
                     <button class="call-btn flip" data-ui="call-flip-btn" title="Flip Camera" style="display: none;"><i
@@ -4473,7 +4741,7 @@
         <audio id="remote-audio" autoplay></audio>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="capacitor.js"></script>
-        <script type="module" src="main.js?v=1.1.11"></script>
+        <script type="module" src="main.js?v=1.1.20"></script>
         <!-- Bootstrap JS Bundle with Popper -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"

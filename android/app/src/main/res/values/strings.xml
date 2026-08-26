@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">hotmapp</string>
-    <string name="title_activity_main">hotmapp</string>
+    <string name="app_name">Hotmapp</string>
+    <string name="title_activity_main">Hotmapp</string>
     <string name="package_name">com.hotmapp.app</string>
     <string name="custom_url_scheme">com.hotmapp.app</string>
     <string name="incoming_call_title">Incoming call</string>

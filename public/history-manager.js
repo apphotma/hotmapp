@@ -253,9 +253,15 @@ export const initHistoryManager = () => {
 
     // Capacitor Native Android/iOS Back Button Handler
     let backButtonRegistered = false;
-    const isActiveVideoCallOverlay = () => {
+    const isActiveCallOverlay = () => {
         const callOverlay = document.querySelector('.call-overlay');
-        return callOverlay && callOverlay.style.display !== 'none' && callOverlay.classList.contains('video-mode') && !callOverlay.classList.contains('minimized');
+        if (!callOverlay || callOverlay.style.display === 'none') {
+            return false;
+        }
+        if (callOverlay.classList.contains('video-mode')) {
+            return !callOverlay.classList.contains('minimized');
+        }
+        return true;
     };
 
     const registerCapacitorBackButton = () => {
@@ -263,7 +269,14 @@ export const initHistoryManager = () => {
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
             const { App } = window.Capacitor.Plugins;
             App.addListener('backButton', (data) => {
-                if (isActiveVideoCallOverlay()) {
+                const forceUpdateModal = document.querySelector('[data-ui="force-update-modal"]');
+                if (forceUpdateModal && forceUpdateModal.style.display === 'flex') {
+                    if (App.exitApp) App.exitApp();
+                    else if (App.minimizeApp) App.minimizeApp();
+                    return;
+                }
+
+                if (isActiveCallOverlay()) {
                     // Dispatch dedicated minimize event so call UI always handles it
                     window.dispatchEvent(new CustomEvent('hotmapp-minimize-call'));
                     return;
@@ -318,7 +331,7 @@ export const initHistoryManager = () => {
     document.addEventListener('backbutton', (e) => {
         if (backButtonRegistered) return;
 
-        if (isActiveVideoCallOverlay()) {
+        if (isActiveCallOverlay()) {
             e.preventDefault();
             // Dispatch dedicated minimize event so call UI always handles it
             window.dispatchEvent(new CustomEvent('hotmapp-minimize-call'));

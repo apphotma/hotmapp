@@ -5,7 +5,7 @@ import { debounce, calculateDistance, getHeuristicTravelTime, getTravelTimeFromA
 import { auth, db } from './firebase-config.js'; // Import db
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { openBusinessLocationPicker, openShopAccessRequestModal } from './store.js';
-import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js?v=1.1.11';
+import { reportBusiness, getBusinessProfile, saveMessage, uploadFile, sendFriendRequest, getUserProfile, saveReview, subscribeToReviews, saveSavedItems, getSavedItems, saveOrder, updateOrder, generateOrderId, getProductsByOwner } from './database-service.js';
 import { getOrDeriveSharedKey, encryptText } from './crypto-helper.js';
 import { pushHistoryState, removeHistoryState, dismissHistoryState } from './history-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
@@ -23,6 +23,55 @@ let cachedBizProfile = null;
 let cachedBizProfileOwnerId = null;
 let cachedDeliveryFee = 0;
 let currentTransportMode = 'driving';
+
+// Distance-based delivery cache variables
+let cachedUseTiers = false;
+let cachedDeliveryRules = [];
+let cachedAllowFallback = false;
+let cachedFallbackFee = 0;
+let cachedFallbackMinFreeOrder = 0;
+let cachedStoreLatitude = 0;
+let cachedStoreLongitude = 0;
+export let selectedDeliveryCoordinates = null;
+
+export const setSelectedDeliveryCoordinates = (coords) => {
+    selectedDeliveryCoordinates = coords;
+    if (typeof window._updateCartUI === 'function') {
+        window._updateCartUI();
+    }
+};
+
+const calculateShippingFee = (subtotal) => {
+    if (deliveryMethod !== 'delivery') return 0;
+    
+    const isFreeDelivery = cachedMinFreeDelivery > 0 && subtotal >= cachedMinFreeDelivery;
+    let fee = isFreeDelivery ? 0 : cachedDeliveryFee;
+    
+    if (cachedUseTiers) {
+        const userCoords = selectedDeliveryCoordinates;
+        if (userCoords && cachedStoreLatitude && cachedStoreLongitude) {
+            const distance = calculateDistance(userCoords.lat, userCoords.lng, cachedStoreLatitude, cachedStoreLongitude);
+            
+            // Find matching tier
+            const matchingRule = cachedDeliveryRules.find(rule => distance <= rule.maxDistance);
+            if (matchingRule) {
+                const minFree = matchingRule.minFreeOrder;
+                const isTierFree = minFree !== undefined && minFree > 0 && subtotal >= minFree;
+                fee = isTierFree ? 0 : matchingRule.fee;
+            } else {
+                if (cachedAllowFallback) {
+                    const minFree = cachedFallbackMinFreeOrder;
+                    const isFallbackFree = minFree > 0 && subtotal >= minFree;
+                    fee = isFallbackFree ? 0 : cachedFallbackFee;
+                } else {
+                    fee = -1; // Out of range!
+                }
+            }
+        }
+    }
+    
+    return fee;
+};
 
 const getCartOwnerId = () => currentShopSellerId || getActiveChatUid();
 const resetSellerContext = (sellerId) => {
@@ -171,6 +220,24 @@ export const updateShopPickupLocations = async (bizProfile, userCoords = null, c
     }
     cachedDeliveryFee = parsePrice((bizProfile?.deliveryFee ?? cachedBizProfile?.deliveryFee) || 0);
     cachedMinFreeDelivery = parsePrice((bizProfile?.minFreeDelivery ?? cachedBizProfile?.minFreeDelivery) || 0);
+    cachedUseTiers = !!(bizProfile?.useTiers ?? cachedBizProfile?.useTiers);
+    cachedDeliveryRules = (bizProfile?.deliveryRules ?? cachedBizProfile?.deliveryRules) || [];
+    cachedAllowFallback = !!(bizProfile?.allowFallback ?? cachedBizProfile?.allowFallback);
+    cachedFallbackFee = parsePrice((bizProfile?.fallbackFee ?? cachedBizProfile?.fallbackFee) || 0);
+    cachedFallbackMinFreeOrder = parsePrice((bizProfile?.fallbackMinFreeOrder ?? cachedBizProfile?.fallbackMinFreeOrder) || 0);
+
+    const firstLoc = locations[0];
+    if (firstLoc && firstLoc.latitude && firstLoc.longitude) {
+        cachedStoreLatitude = firstLoc.latitude;
+        cachedStoreLongitude = firstLoc.longitude;
+    } else {
+        cachedStoreLatitude = 0;
+        cachedStoreLongitude = 0;
+    }
+
+    if (userCoords) {
+        selectedDeliveryCoordinates = userCoords;
+    }
 
     // Update Shop Header with Category and Name
     if (elements.shopCategoryDisplay) {
@@ -523,6 +590,311 @@ export const openShopLocationsMapModal = async (locations, userCoords = null) =>
     setTimeout(() => shopLocationsMapInstance.invalidateSize(), 100); // Small delay to ensure modal is fully rendered
 };
 
+/**
+ * Generates an official jsPDF invoice document for an order.
+ * Works entirely client-side with zero dependencies on remote storage.
+ */
+export const generateOrderInvoiceDoc = async (order, options = {}) => {
+    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!jsPDFClass) {
+        throw new Error("jsPDF library is not loaded on this device.");
+    }
+    const doc = new jsPDFClass();
+    const invoiceBlue = [0, 0, 255];
+    doc.setFont(undefined, 'normal');
+
+    let transparentLogoBase64 = null;
+    let bizProfile = null;
+    let bizAddress = "Not specified";
+
+    if (order.sellerId) {
+        bizProfile = getBusinessProfile(order.sellerId);
+        if (!bizProfile) {
+            try {
+                const snap = await get(ref(db, `businesses/${order.sellerId}`));
+                if (snap.exists()) bizProfile = snap.val();
+            } catch (e) {}
+        }
+    }
+
+    if (bizProfile) {
+        if (bizProfile.pickupLocations && bizProfile.pickupLocations.length > 0) {
+            bizAddress = bizProfile.pickupLocations[0].address;
+        } else if (bizProfile.pickupAddress) {
+            bizAddress = bizProfile.pickupAddress;
+        }
+        const logoUrl = bizProfile.logoUrl || bizProfile.businessLogo;
+        if (logoUrl) {
+            try {
+                transparentLogoBase64 = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'Anonymous';
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.globalAlpha = 0.12;
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = logoUrl;
+                });
+            } catch (e) {}
+        }
+    }
+
+    if (transparentLogoBase64) {
+        try {
+            doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+        } catch (err) {}
+    }
+
+    const bizName = bizProfile?.companyName ? bizProfile.companyName.trim().toUpperCase() : "HOTMAPP";
+    doc.setFontSize(22);
+    doc.setTextColor(18, 140, 126);
+    doc.text(`${bizName} ORDER INVOICE`, 105, 20, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    const orderDate = order.timestamp ? new Date(order.timestamp).toLocaleString() : new Date().toLocaleString();
+    doc.text(`Date: ${orderDate}`, 20, 32);
+    const orderNumber = order.orderNumber || ('HTM-' + (order.id ? String(order.id).substring(0, 6).toUpperCase() : Math.floor(100000 + Math.random() * 900000)));
+    doc.text(`Order Number: ${orderNumber}`, 190, 32, { align: "right" });
+
+    const chatName = options.chatName || elements.chatHeaderName?.textContent || "Customer";
+    doc.text(`Customer: ${chatName}`, 20, 39);
+
+    let currentY = 44;
+    if (order.deliveryMethod === 'delivery' && order.deliveryAddress) {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'bold');
+        doc.text("DELIVERY ADDRESS:", 20, 46);
+        const wrappedAddr = doc.splitTextToSize(order.deliveryAddress, 170);
+        doc.text(wrappedAddr, 20, 51);
+        currentY = 51 + (wrappedAddr.length * 5) + 2;
+
+        doc.setFillColor(232, 245, 233);
+        doc.rect(160, 35, 30, 7, 'F');
+        doc.setTextColor(46, 125, 50);
+        doc.text("DELIVERY", 175, 40, { align: "center" });
+    } else if (order.pickupLocation) {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'bold');
+        doc.text("PICKUP LOCATION:", 20, 46);
+        const locInfo = typeof order.pickupLocation === 'string' ? order.pickupLocation : `${order.pickupLocation.name || 'Store'} - ${order.pickupLocation.address || ''}`;
+        const wrappedInfo = doc.splitTextToSize(locInfo, 170);
+        doc.text(wrappedInfo, 20, 51);
+        currentY = 51 + (wrappedInfo.length * 5) + 2;
+    }
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(20, currentY, 190, currentY);
+
+    let y = currentY + 11;
+    const items = order.items || [];
+    const currency = order.currency || '$';
+
+    // Pre-load all item images in parallel as base64 data URLs
+    const base64Images = await Promise.all(
+        items.map(async (item) => {
+            const imgUrl = item.image || item.imageUrl || (Array.isArray(item.images) && item.images[0]) || (Array.isArray(item.photos) && item.photos[0]) || item.photo || null;
+            if (imgUrl) {
+                try {
+                    return await getBase64ImageFromUrl(imgUrl);
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        })
+    );
+
+    items.forEach((item, index) => {
+        const itemPrice = parseFloat(item.price) || 0;
+        const itemQty = parseInt(item.quantity, 10) || 1;
+        const itemTotal = formatPriceWithCommas(itemPrice * itemQty);
+        const imgBase64 = base64Images[index];
+        const textX = imgBase64 ? 35 : 20;
+
+        const prefix = `${index + 1}. `;
+        const prefixWidth = doc.getTextWidth(prefix);
+        const productName = item.name || 'Product';
+
+        const nameLines = doc.splitTextToSize(productName, 135 - (textX + prefixWidth));
+
+        const detailsParts = [];
+        if (item.form) detailsParts.push(`(${item.form.trim()})`);
+        if (item.productQty) detailsParts.push(`(${item.productQty})`);
+        detailsParts.push(`(Quantity: ${itemQty})`);
+        detailsParts.push(`(${currency}${formatPriceWithCommas(itemPrice)} x ${itemQty})`);
+        const detailsText = detailsParts.join(' ');
+        const detailsLines = doc.splitTextToSize(detailsText, 135 - (textX + prefixWidth));
+
+        const lineSpacing = 5;
+        const totalLinesCount = nameLines.length + detailsLines.length;
+        const itemHeight = Math.max(13, 5 + (totalLinesCount * lineSpacing));
+
+        if (y + itemHeight > 270) {
+            doc.addPage();
+            if (transparentLogoBase64) {
+                try {
+                    doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+                } catch (err) {}
+            }
+            y = 25;
+        }
+
+        // Draw product thumbnail if available
+        if (imgBase64) {
+            try {
+                let format = 'JPEG';
+                if (imgBase64.startsWith('data:image/png')) {
+                    format = 'PNG';
+                } else if (imgBase64.startsWith('data:image/webp')) {
+                    format = 'WEBP';
+                }
+                doc.addImage(imgBase64, format, 20, y - 5, 11, 11);
+            } catch (err) {
+                console.warn("Could not draw product thumbnail in invoice:", err);
+            }
+        }
+
+        doc.setTextColor(0, 0, 0);
+        doc.text(prefix, textX, y);
+
+        doc.setTextColor(...invoiceBlue);
+        nameLines.forEach((line, lineIdx) => {
+            doc.text(line, textX + prefixWidth, y + (lineIdx * 5));
+        });
+
+        const detailsStartY = y + (nameLines.length * 5);
+        doc.setTextColor(0, 0, 0);
+        detailsLines.forEach((line, lineIdx) => {
+            doc.text(line, textX + prefixWidth, detailsStartY + (lineIdx * 5));
+        });
+
+        doc.setTextColor(...invoiceBlue);
+        doc.text(`${currency}${itemTotal}`, 190, y, { align: 'right' });
+
+        y += itemHeight;
+    });
+
+    if (y + 10 > 270) {
+        doc.addPage();
+        if (transparentLogoBase64) {
+            try {
+                doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+            } catch (err) {}
+        }
+        y = 25;
+    }
+    doc.line(20, y, 190, y);
+    y += 10;
+
+    const subtotal = order.subtotal !== undefined ? order.subtotal : items.reduce((acc, it) => acc + ((parseFloat(it.price) || 0) * (parseInt(it.quantity, 10) || 1)), 0);
+    const shipping = order.shipping !== undefined ? order.shipping : 0;
+    const total = order.total !== undefined ? order.total : (subtotal + (shipping > 0 ? shipping : 0));
+    const isFreeDelivery = (order.deliveryMethod === 'delivery' && shipping === 0);
+    const totalItemsCount = items.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 1), 0);
+
+    if (y + 35 > 270) {
+        doc.addPage();
+        if (transparentLogoBase64) {
+            try {
+                doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+            } catch (err) {}
+        }
+        y = 25;
+    }
+
+    // 1. Items Total
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Items Total (${totalItemsCount} item${totalItemsCount > 1 ? 's' : ''}):`, 90, y);
+    doc.setTextColor(...invoiceBlue);
+    doc.text(`${currency}${formatPriceWithCommas(subtotal)}`, 190, y, { align: 'right' });
+    y += 7;
+
+    // 2. Delivery Fee
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    if (order.deliveryMethod === 'delivery') {
+        doc.text(`Delivery Fee:`, 90, y);
+        if (isFreeDelivery) {
+            doc.setTextColor(18, 140, 126);
+            doc.text(`FREE (${currency}0.00)`, 190, y, { align: 'right' });
+        } else {
+            doc.setTextColor(...invoiceBlue);
+            doc.text(`${currency}${formatPriceWithCommas(shipping)}`, 190, y, { align: 'right' });
+        }
+    } else {
+        doc.text(`Delivery Fee:`, 90, y);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`${currency}0.00 (Self Pickup)`, 190, y, { align: 'right' });
+    }
+    y += 8;
+
+    // Dividing line
+    doc.setDrawColor(210, 210, 210);
+    doc.line(90, y, 190, y);
+    y += 7;
+
+    // 3. Total Payment
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`TOTAL PAYMENT:`, 90, y);
+    doc.setTextColor(...invoiceBlue);
+    doc.text(`${currency}${formatPriceWithCommas(total)}`, 190, y, { align: 'right' });
+    doc.setFont(undefined, 'normal');
+
+    if (y + 25 > 270) {
+        doc.addPage();
+        if (transparentLogoBase64) {
+            try {
+                doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+            } catch (err) {}
+        }
+        y = 25;
+    }
+    y += 20;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Business Address: ${bizAddress}`, 105, y, { align: "center" });
+    y += 6;
+    doc.text("Thank you for your business! We hope to see you again soon.", 105, y, { align: "center" });
+
+    if (y + 35 > 270) {
+        doc.addPage();
+        if (transparentLogoBase64) {
+            try {
+                doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
+            } catch (err) {}
+        }
+        y = 25;
+    }
+    y += 25;
+    doc.setDrawColor(100, 100, 100);
+    doc.line(20, y, 70, y);
+    doc.text("Customer Signature", 45, y + 5, { align: "center" });
+    doc.line(140, y, 190, y);
+    doc.text("Authorized Signature", 165, y + 5, { align: "center" });
+
+    const pdfBlob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+
+    return { doc, blob: pdfBlob, blobUrl, orderNumber };
+};
+
 export const initShop = () => {
     let currentShopProducts = [];
     const openShopMode = () => {
@@ -606,7 +978,7 @@ export const initShop = () => {
             const imagesAttr = JSON.stringify(product.images || []);
             const priceHtml = `<span class="product-currency">${product.currency}</span>${parsePrice(product.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             
-            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
+            const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; transform: none; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
             const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
             const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
             const btnHtml = product.soldOut 
@@ -614,7 +986,7 @@ export const initShop = () => {
                 : '<button class="add-to-cart-btn">Add to Cart</button>';
 
             const shopHtml = `
-                <div class="${cardClass}" data-id="${product.id}" data-images=\'${imagesAttr}\' ${cardStyle}>
+                <div class="${cardClass}" data-id="${product.id}" data-images=\'${imagesAttr}\' ${cardStyle} data-ui="product-card">
                     ${soldOutBadge}
                     <div class="image-loader-wrapper">
                         <div class="spinner"></div>
@@ -817,7 +1189,8 @@ export const initShop = () => {
         if (elements.businessLocationPickerModal) {
             elements.businessLocationPickerModal.dataset.mode = 'delivery-address';
             const currentAddr = elements.deliveryAddressInput?.value.trim();
-            openBusinessLocationPicker('delivery-address', currentAddr ? { address: currentAddr } : null);
+            const coords = selectedDeliveryCoordinates ? { latitude: selectedDeliveryCoordinates.lat, longitude: selectedDeliveryCoordinates.lng } : (cachedStoreLatitude && cachedStoreLongitude ? { latitude: cachedStoreLatitude, longitude: cachedStoreLongitude } : null);
+            openBusinessLocationPicker('delivery-address', coords ? { ...coords, address: currentAddr } : (currentAddr ? { address: currentAddr } : null));
         }
     });
 
@@ -834,6 +1207,7 @@ export const initShop = () => {
 
         navigator.geolocation.getCurrentPosition(async (position) => {
             const { latitude: lat, longitude: lng } = position.coords;
+            setSelectedDeliveryCoordinates({ lat, lng });
             try {
                 const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                 const data = await resp.json();
@@ -843,9 +1217,14 @@ export const initShop = () => {
                     if (elements.deliveryAddressInput) {
                         elements.deliveryAddressInput.value = address;
                         elements.deliveryAddressInput.dispatchEvent(new Event('input'));
+                        elements.deliveryAddressInput.dispatchEvent(new Event('change'));
                     }
                 } else {
-                    if (elements.addrStreet) elements.addrStreet.value = address;
+                    if (elements.addrStreet) {
+                        elements.addrStreet.value = address;
+                        elements.addrStreet.dispatchEvent(new Event('input'));
+                        elements.addrStreet.dispatchEvent(new Event('change'));
+                    }
                     showToast("Street address set. Please verify City/State.", "info");
                 }
 
@@ -974,8 +1353,8 @@ export const initShop = () => {
                     ${data.deliveryCoverage?.countries?.length ? `<p style="margin-top: 4px;"><strong>Countries:</strong> ${data.deliveryCoverage.countries.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.states?.length ? `<p style="margin-top: 4px;"><strong>States:</strong> ${data.deliveryCoverage.states.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.cities?.length ? `<p style="margin-top: 4px;"><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>` : ''}
-                    ${data.deliveryFee ? `<p style="margin-top: 4px;">Base Fee: $${formatPriceWithCommas(data.deliveryFee)}</p>` : ''}
-                    ${data.minFreeDelivery ? `<p style="margin-top: 4px;">Free Delivery threshold: $${formatPriceWithCommas(data.minFreeDelivery)}</p>` : ''}
+                    ${data.deliveryFee ? `<p style="margin-top: 4px;">Base Fee: ${data.currency || '$'}${formatPriceWithCommas(data.deliveryFee)}</p>` : ''}
+                    ${data.minFreeDelivery ? `<p style="margin-top: 4px;">Free Delivery threshold: ${data.currency || '$'}${formatPriceWithCommas(data.minFreeDelivery)}</p>` : ''}
                 </div>
             </div>
         `;
@@ -1301,9 +1680,10 @@ const handleStarRating = (e) => {
         const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         const currency = cart.length > 0 ? cart[0].currency : (savedItems.length > 0 ? savedItems[0].currency : '$');
 
-        const isFreeDelivery = cachedMinFreeDelivery > 0 && subtotal >= cachedMinFreeDelivery;
-        const shipping = (deliveryMethod === 'delivery' && !isFreeDelivery) ? cachedDeliveryFee : 0;
-        const total = subtotal + shipping;
+        const shipping = calculateShippingFee(subtotal);
+        const isOutOfRange = (deliveryMethod === 'delivery' && shipping === -1);
+        const total = subtotal + (isOutOfRange ? 0 : shipping);
+        const isFreeDelivery = (deliveryMethod === 'delivery' && !isOutOfRange && shipping === 0);
 
         // Update Tab UI and counts
         if (elements.cartTabCount) elements.cartTabCount.textContent = cart.length;
@@ -1415,24 +1795,56 @@ const handleStarRating = (e) => {
         if (elements.cartTotalDisplay) {
             let html = `<div>Total: ${currency}${formatPriceWithCommas(total)}</div>`;
             if (deliveryMethod === 'delivery') {
-                if (isFreeDelivery) {
+                if (isOutOfRange) {
+                    html = `
+                        <div style="font-size: 0.85rem; color: var(--danger); margin-bottom: 2px; font-weight: 600;">
+                            ⚠️ Outside Delivery Area
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--muted);">
+                            Store does not deliver to your location.
+                        </div>
+                    `;
+                } else if (isFreeDelivery) {
+                    const freeThreshold = cachedUseTiers ? 
+                        (cachedDeliveryRules.find(r => calculateDistance(selectedDeliveryCoordinates?.lat || 0, selectedDeliveryCoordinates?.lng || 0, cachedStoreLatitude, cachedStoreLongitude) <= r.maxDistance)?.minFreeOrder || cachedMinFreeDelivery) : 
+                        cachedMinFreeDelivery;
                     html = `
                         <div style="font-size: 0.85rem; color: var(--brand); margin-bottom: 2px; font-weight: 600;">
-                            🎉 Free Delivery Applied! (Subtotal over ${currency}${formatPriceWithCommas(cachedMinFreeDelivery)})
+                            🎉 Free Delivery Applied! ${freeThreshold > 0 ? `(Subtotal over ${currency}${formatPriceWithCommas(freeThreshold)})` : ''}
                         </div>
                         <div style="font-weight: 700;">Total: ${currency}${formatPriceWithCommas(total)}</div>
                     `;
                 } else if (shipping > 0) {
+                    const activeRule = cachedUseTiers ? 
+                        cachedDeliveryRules.find(r => calculateDistance(selectedDeliveryCoordinates?.lat || 0, selectedDeliveryCoordinates?.lng || 0, cachedStoreLatitude, cachedStoreLongitude) <= r.maxDistance) : 
+                        null;
+                    const freeThreshold = activeRule ? activeRule.minFreeOrder : cachedMinFreeDelivery;
                     html = `
                         <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 2px;">
                             Subtotal: ${currency}${formatPriceWithCommas(subtotal)} + Delivery: ${currency}${formatPriceWithCommas(shipping)}
                         </div>
-                        ${cachedMinFreeDelivery > 0 ? `<div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 2px;">Add ${currency}${formatPriceWithCommas(cachedMinFreeDelivery - subtotal)} more for free delivery</div>` : ''}
+                        ${freeThreshold > 0 ? `<div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 2px;">Add ${currency}${formatPriceWithCommas(freeThreshold - subtotal)} more for free delivery</div>` : ''}
                         <div style="font-weight: 700;">Total: ${currency}${formatPriceWithCommas(total)}</div>
                     `;
                 }
             }
             elements.cartTotalDisplay.innerHTML = html;
+        }
+
+        // Enable or disable checkout button
+        const checkoutBtn = document.querySelector('[data-ui="checkout-btn"]') || document.querySelector('.checkout-btn');
+        if (checkoutBtn) {
+            if (deliveryMethod === 'delivery' && isOutOfRange) {
+                checkoutBtn.disabled = true;
+                checkoutBtn.style.opacity = '0.5';
+                checkoutBtn.style.cursor = 'not-allowed';
+                checkoutBtn.title = "Store does not deliver to your location";
+            } else {
+                checkoutBtn.disabled = false;
+                checkoutBtn.style.opacity = '1';
+                checkoutBtn.style.cursor = 'pointer';
+                checkoutBtn.title = "Proceed to Checkout";
+            }
         }
 
         // Persist to user-specific localStorage
@@ -1880,266 +2292,22 @@ const handleStarRating = (e) => {
                 if (!currentActiveChatUid) {
                     throw new Error("No active chat target found. Please open a chat with the seller first.");
                 }
-                const bizProfile = await getBusinessProfile(currentActiveChatUid);
-                const paymentData = bizProfile?.paymentInfo || `hotmapp_pay_id:${currentActiveChatUid}`;
-                const bizAddress = bizProfile?.pickupLocations?.[0]?.address || "Address not provided";
 
-                // Pre-load all cart product images as base64 in parallel, along with the logo
-                const [logoBase64, ...base64Images] = await Promise.all([
-                    getBase64ImageFromUrl('hotmapp-logo.png'), // Relative path to support file:// and subroutes
-                    ...cart.map(async (item) => {
-                        if (item.image) {
-                            return await getBase64ImageFromUrl(item.image);
-                        }
-                        return null;
-                    })
-                ]);
-
-                // Create a semi-transparent watermark logo using a client-side canvas
-                let transparentLogoBase64 = null;
-                
-                // Try DOM canvas drawing first (synchronous & works offline/file://)
-                const logoImgEl = document.querySelector('.app-logo');
-                if (logoImgEl && logoImgEl.complete && logoImgEl.naturalWidth !== 0) {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = logoImgEl.naturalWidth;
-                        canvas.height = logoImgEl.naturalHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.globalAlpha = 0.15; // 15% opacity acts as a visible yet subtle watermark
-                        ctx.drawImage(logoImgEl, 0, 0);
-                        transparentLogoBase64 = canvas.toDataURL('image/png');
-                    } catch (e) {
-                        console.warn("DOM canvas watermark failed, falling back to fetched base64:", e);
-                    }
-                }
-
-                // Fall back to fetched base64 if DOM canvas drawing wasn't successful
-                if (!transparentLogoBase64 && logoBase64) {
-                    try {
-                        transparentLogoBase64 = await new Promise((resolve) => {
-                            const img = new Image();
-                            img.onload = () => {
-                                const canvas = document.createElement('canvas');
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                const ctx = canvas.getContext('2d');
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                ctx.globalAlpha = 0.15; // 15% opacity
-                                ctx.drawImage(img, 0, 0);
-                                resolve(canvas.toDataURL('image/png'));
-                            };
-                            img.onerror = () => resolve(null);
-                            img.src = logoBase64;
-                        });
-                    } catch (e) {
-                        console.error("Error creating transparent logo watermark from fallback:", e);
-                    }
-                }
-
-                // Generate PDF using jsPDF
-                const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-                if (!jsPDFClass) {
-                    throw new Error("jsPDF library is not loaded on this device.");
-                }
-                const doc = new jsPDFClass();
-                const invoiceBlue = [0, 0, 255];
-                
-                // Use normal font weight by default for a lighter invoice appearance
-                doc.setFont(undefined, 'normal');
-
-                // Add transparent watermark logo in the middle of the invoice page
-                if (transparentLogoBase64) {
-                    try {
-                        // A4 size is 210 x 297 mm. Center: x = 105 - 50 = 55, y = 148.5 - 50 = 98.5
-                        doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
-                    } catch (err) {
-                        console.error("Error adding watermark logo to PDF:", err);
-                    }
-                }
-
-                const bizName = bizProfile?.companyName ? bizProfile.companyName.trim().toUpperCase() : "HOTMAPP";
-                doc.setFontSize(22);
-                doc.setTextColor(18, 140, 126); // Brand color matching WhatsApp-style UI
-                doc.text(`${bizName} ORDER INVOICE`, 105, 20, { align: "center" });
-
-                doc.setFontSize(12);
-                doc.setTextColor(0, 0, 0);
-                doc.text(`Date: ${new Date().toLocaleString()}`, 20, 32);
-                const orderNumber = 'HTM-' + Math.floor(100000 + Math.random() * 900000);
-                doc.text(`Order Number: ${orderNumber}`, 190, 32, { align: "right" });
-                const chatName = elements.chatHeaderName?.textContent || "Customer";
-                doc.text(`Customer: ${chatName}`, 20, 39);
-
-                let currentY = 44;
-                if (deliveryMethod === 'delivery') {
-                    doc.setFontSize(10);
-                    doc.setTextColor(100, 100, 100);
-                    doc.setFont(undefined, 'bold');
-                    doc.text("DELIVERY ADDRESS:", 20, 46);
-                    doc.setFont(undefined, 'bold');
-                    const wrappedAddr = doc.splitTextToSize(deliveryAddress, 170);
-                    doc.text(wrappedAddr, 20, 51);
-                    currentY = 51 + (wrappedAddr.length * 5) + 2;
-
-                    // Add a fulfillment badge
-                    doc.setFillColor(232, 245, 233);
-                    doc.rect(160, 35, 30, 7, 'F');
-                    doc.setTextColor(46, 125, 50);
-                    doc.text("DELIVERY", 175, 40, { align: "center" });
-                } else if (selectedPickupLocation) {
-                    doc.setFontSize(10);
-                    doc.setTextColor(100, 100, 100);
-                    doc.setFont(undefined, 'bold');
-                    doc.text("PICKUP LOCATION:", 20, 46);
-                    doc.setFont(undefined, 'bold');
-                    const locInfo = `${selectedPickupLocation.name || 'Store'} - ${selectedPickupLocation.address}`;
-                    const wrappedInfo = doc.splitTextToSize(locInfo, 170);
-                    doc.text(wrappedInfo, 20, 51);
-                    currentY = 51 + (wrappedInfo.length * 5) + 2;
-                }
-
-                doc.setDrawColor(220, 220, 220);
-                doc.line(20, currentY, 190, currentY);
-
-                let y = currentY + 11;
-                cart.forEach((item, index) => {
-                    const itemTotal = formatPriceWithCommas(item.price * item.quantity);
-                    const imgBase64 = base64Images[index];
-
-                    if (imgBase64) {
-                        try {
-                            let format = 'JPEG';
-                            if (imgBase64.startsWith('data:image/png')) {
-                                format = 'PNG';
-                            } else if (imgBase64.startsWith('data:image/webp')) {
-                                format = 'WEBP';
-                            }
-                            // Adding the image at a small scale (10x10mm) to the left of the text
-                            doc.addImage(imgBase64, format, 20, y - 7, 10, 10);
-                        } catch (err) {
-                            console.error("Error adding image to PDF:", err);
-                        }
-                    }
-
-                    const detail = `${item.form} ${item.productQty}`.trim();
-                    const detailText = detail ? ` (${detail})` : '';
-                    const textX = imgBase64 ? 35 : 20;
-
-                    const prefix = `${index + 1}. `;
-                    const prefixWidth = doc.getTextWidth(prefix);
-                    const productName = item.name;
-
-                    // Line 1: Split product name to fit
-                    const nameLines = doc.splitTextToSize(productName, 135 - (textX + prefixWidth));
-
-                    // Line 2: Build description details underneath the name
-                    const detailsParts = [];
-                    if (item.form) {
-                        detailsParts.push(`(${item.form.trim()})`);
-                    }
-                    if (item.quantity !== undefined && item.quantity !== null) {
-                        detailsParts.push(`(Quantity: ${item.quantity})`);
-                    }
-                    detailsParts.push(`(${item.currency}${formatPriceWithCommas(item.price)} x ${item.quantity})`);
-                    const detailsText = detailsParts.join(' ');
-                    const detailsLines = doc.splitTextToSize(detailsText, 135 - (textX + prefixWidth));
-
-                    // Draw index prefix in black
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(prefix, textX, y);
-
-                    // Draw product name lines in blue
-                    doc.setTextColor(...invoiceBlue);
-                    nameLines.forEach((line, lineIdx) => {
-                        doc.text(line, textX + prefixWidth, y + (lineIdx * 5));
-                    });
-
-                    // Draw details lines in black underneath product name lines
-                    const detailsStartY = y + (nameLines.length * 5);
-                    doc.setTextColor(0, 0, 0);
-                    detailsLines.forEach((line, lineIdx) => {
-                        doc.text(line, textX + prefixWidth, detailsStartY + (lineIdx * 5));
-                    });
-
-                    // Draw item total in blue (aligned to the first line)
-                    doc.setTextColor(...invoiceBlue);
-                    doc.text(`${item.currency}${itemTotal}`, 170, y, { align: 'right' });
-
-                    // Increment y dynamically based on total lines drawn to avoid overlaps
-                    const lineSpacing = 5;
-                    const totalLinesCount = nameLines.length + detailsLines.length;
-                    const itemHeight = Math.max(12, 5 + (totalLinesCount * lineSpacing));
-                    y += itemHeight;
-                });
-
-                doc.line(20, y, 190, y);
-                y += 10;
-
-                const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-                const isFreeDelivery = cachedMinFreeDelivery > 0 && subtotal >= cachedMinFreeDelivery;
-                const shipping = (deliveryMethod === 'delivery' && !isFreeDelivery) ? cachedDeliveryFee : 0;
-                const total = subtotal + shipping;
-                const currency = cart[0].currency;
-
-                if (deliveryMethod === 'delivery' && isFreeDelivery) {
-                    doc.setFont(undefined, 'normal');
-                    doc.setTextColor(18, 140, 126);
-                    doc.text(`FREE DELIVERY APPLIED`, 170, y, { align: 'right' });
-                    doc.setTextColor(...invoiceBlue);
-                    y += 7;
-                } else if (shipping > 0) {
-                    doc.setFont(undefined, 'normal');
-                    doc.setTextColor(...invoiceBlue);
-                    doc.text(`Subtotal: ${currency}${formatPriceWithCommas(subtotal)}`, 170, y, { align: 'right' });
-                    y += 7;
-                    doc.text(`Delivery Fee: ${currency}${formatPriceWithCommas(shipping)}`, 170, y, { align: 'right' });
-                    y += 7;
-                }
-
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(...invoiceBlue);
-                doc.text(`TOTAL AMOUNT: ${currency}${formatPriceWithCommas(total)}`, 170, y, { align: 'right' });
-
-                // Footer
-                y += 20;
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(100, 100, 100);
-                doc.text(`Business Address: ${bizAddress}`, 105, y, { align: "center" });
-                y += 6;
-                doc.text("Thank you for your business! We hope to see you again soon.", 105, y, { align: "center" });
-
-                // Signature Line
-                y += 25;
-                doc.setDrawColor(100, 100, 100);
-                doc.line(20, y, 70, y);
-                doc.text("Customer Signature", 45, y + 5, { align: "center" });
-                doc.line(140, y, 190, y);
-                doc.text("Authorized Signature", 165, y + 5, { align: "center" });
-
-                const pdfBlob = doc.output('blob');
-                const fileName = `Invoice_${Date.now()}.pdf`;
-                const localUrl = URL.createObjectURL(pdfBlob);
-
-                // 5. Upload PDF to Storage and Save to Database
                 const user = auth.currentUser;
                 const chatId = currentActiveChatUid.startsWith('group_') ? currentActiveChatUid : [user.uid, currentActiveChatUid].sort().join('_');
-                const storagePath = `chat_media/${chatId}/${Date.now()}_${user.uid}.pdf`;
-
-                btn.innerHTML = '<span class="spinner"></span> Sending Order...';
-
-                // 1. Generate Order ID client-side
                 const orderId = generateOrderId();
 
-                // 2. Prepare Order Data (initially without downloadURL)
-                const orderData = {
+                const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+                const shipping = calculateShippingFee(subtotal);
+                const total = subtotal + (shipping === -1 ? 0 : shipping);
+                const currency = cart[0]?.currency || '$';
+
+                const rawOrderData = {
+                    id: orderId,
                     buyerId: user.uid,
                     sellerId: currentActiveChatUid,
                     chatId: chatId,
                     timestamp: Date.now(),
-                    orderNumber: orderNumber,
                     deliveryMethod: deliveryMethod,
                     deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : null,
                     pickupLocation: deliveryMethod === 'pickup' ? selectedPickupLocation : null,
@@ -2153,9 +2321,22 @@ const handleStarRating = (e) => {
                         price: item.price,
                         quantity: item.quantity,
                         form: item.form || '',
-                        productQty: item.productQty || ''
-                    })),
-                    downloadURL: null, // Initially null, will be updated in the background
+                        productQty: item.productQty || '',
+                        image: item.image || item.imageUrl || (Array.isArray(item.images) && item.images[0]) || (Array.isArray(item.photos) && item.photos[0]) || item.photo || ''
+                    }))
+                };
+
+                btn.innerHTML = '<span class="spinner"></span> Sending Order...';
+
+                // Generate PDF client-side
+                const { doc, blob: pdfBlob, blobUrl: localUrl, orderNumber } = await generateOrderInvoiceDoc(rawOrderData);
+                const fileName = `Invoice_${orderNumber}.pdf`;
+                const storagePath = `chat_media/${chatId}/${Date.now()}_${user.uid}.pdf`;
+
+                const orderData = {
+                    ...rawOrderData,
+                    orderNumber: orderNumber,
+                    downloadURL: null,
                     fileName: fileName,
                     fileSize: pdfBlob.size,
                     status: 'pending'
@@ -2185,7 +2366,6 @@ const handleStarRating = (e) => {
                     previewText: `📄 Invoice ${orderNumber}`,
                     status: chatId.startsWith('group_') ? 'notified' : 'sent'
                 };
-
 
                 await saveMessage(chatId, messageData);
 

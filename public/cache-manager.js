@@ -1,5 +1,5 @@
 const DB_NAME = 'hotmapp_cache_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -11,6 +11,11 @@ export async function getDB() {
 
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
+
+            // Media Cache store: key is file URL, stores binary Blob
+            if (!db.objectStoreNames.contains('media_cache')) {
+                db.createObjectStore('media_cache', { keyPath: 'id' });
+            }
 
             // Messages store: key is message id, with index on chatId
             if (!db.objectStoreNames.contains('messages')) {
@@ -177,5 +182,35 @@ export async function clearStore(storeName) {
         });
     } catch (err) {
         console.error(`Error clearing store ${storeName}:`, err);
+    }
+}
+
+// Check cache or fetch binary file blob from Firebase Storage, cache it, and return a local Object URL
+export async function getOrFetchMediaBlobUrl(url) {
+    if (!url || url.startsWith('data:') || url.startsWith('blob:') || url === 'null' || url === 'undefined') {
+        return url;
+    }
+
+    try {
+        const cached = await getCachedItem('media_cache', url);
+        if (cached && cached.blob) {
+            return URL.createObjectURL(cached.blob);
+        }
+    } catch (err) {
+        console.warn("IndexedDB media_cache read failed:", err);
+    }
+
+    if (!navigator.onLine) {
+        return url;
+    }
+
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        await cacheItem('media_cache', { id: url, blob });
+        return URL.createObjectURL(blob);
+    } catch (err) {
+        console.warn("Failed to fetch and cache remote media resource:", err);
+        return url;
     }
 }

@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getStarredMessages, clearAllStarredMessages, getUserProfile } from './database-service.js?v=1.1.11';
+import { getStarredMessages, clearAllStarredMessages, getUserProfile } from './database-service.js';
 import { showToast } from './toast.js';
 import { getOrDeriveSharedKey, decryptText } from './crypto-helper.js';
 
@@ -78,13 +78,25 @@ export const initStarredMessages = () => {
         if (!user) return;
 
         if (confirm("Are you sure you want to unstar all messages?")) {
+            const btn = elements.unstarAllBtn;
+            if (!btn || btn.disabled) return;
+            const originalHtml = btn.innerHTML;
+
             try {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Unstarring...';
+
                 await clearAllStarredMessages(user.uid);
                 showToast("All messages unstarred", "success");
                 loadStarredMessages();
             } catch (error) {
                 console.error("Error clearing starred messages:", error);
                 showToast("Failed to unstar messages", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
             }
         }
     });

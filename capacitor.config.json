@@ -1,6 +1,6 @@
 {
   "appId": "com.hotmapp.app",
-  "appName": "hotmapp",
+  "appName": "Hotmapp",
   "webDir": "public",
   "server": {
     "androidScheme": "https",

@@ -284,6 +284,10 @@ export const initNavigation = () => {
             [elements.generalMarketArea],
             [elements.chatSidebar, elements.custSidebar, elements.chatArea, elements.storeArea, elements.starredSidebar, elements.callsSidebar, elements.archivedSidebar, elements.lockedChatsSidebar]
         );
+        // Automatically trigger market refresh to load products
+        setTimeout(() => {
+            elements.marketRefreshBtn?.click();
+        }, 300);
     });
 
     // Navigation: Store
@@ -292,6 +296,10 @@ export const initNavigation = () => {
             [elements.storeArea], 
             [elements.chatSidebar, elements.custSidebar, elements.chatArea, elements.generalMarketArea, elements.starredSidebar, elements.callsSidebar, elements.archivedSidebar, elements.lockedChatsSidebar]
         );
+        // Automatically trigger store refresh to load products
+        setTimeout(() => {
+            elements.storeRefreshBtn?.click();
+        }, 300);
     });
 
     // Navigation: Starred
@@ -404,6 +412,17 @@ export const openStoreView = () => {
     // Clear any ongoing transition cleanups
     clearActiveTransition();
 
+    // Handle history navigation for Store view
+    if (window.history.state && window.history.state.hotmappState === 'header-dropdown-menu') {
+        replaceHistoryState('tab-navigation', () => {
+            elements.chatsNav?.click();
+        });
+    } else {
+        pushHistoryState('tab-navigation', () => {
+            elements.chatsNav?.click();
+        });
+    }
+
     // Update active class on tab buttons
     const currentActiveTab = document.querySelector('.nav-item.active');
     if (currentActiveTab) currentActiveTab.classList.remove('active');
@@ -431,6 +450,11 @@ export const openStoreView = () => {
     if (elements.storeArea) {
         elements.storeArea.style.display = 'block';
     }
+
+    // Automatically trigger store refresh to load products
+    setTimeout(() => {
+        elements.storeRefreshBtn?.click();
+    }, 300);
 
     // Reset list scroll state on mobile
     elements.chatContainer?.classList.remove('viewing-chat');

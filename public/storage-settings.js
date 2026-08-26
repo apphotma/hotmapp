@@ -6,7 +6,7 @@ import {
     getChatList, 
     deleteFile, 
     deleteMessagesBatch 
-} from './database-service.js?v=1.1.11';
+} from './database-service.js';
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';
@@ -327,9 +327,16 @@ const executeMediaDeletion = async () => {
     
     if (!confirm(confirmMessage)) return;
 
+    const btn = elements.chatStorageDeleteBtn;
+    if (!btn || btn.disabled) return;
+    const originalHtml = btn.innerHTML;
+
     showToast("Deleting files...", "info");
 
     try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Deleting...';
+
         const chatData = chatsStorageData.find(c => c.chatId === activeStorageChatId) || { messages: largeFiles };
         const msgIds = Array.from(selectedMediaForDeletion);
 
@@ -358,6 +365,11 @@ const executeMediaDeletion = async () => {
     } catch (err) {
         console.error("Deletion error:", err);
         showToast("Failed to delete some files", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
     }
 };
 

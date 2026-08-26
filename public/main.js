@@ -1,21 +1,22 @@
-import { initNavigation } from './navigation.js?v=1.1.11';
-import { initChatSelection } from './chat.js?v=1.1.11';
-import { initStore, refreshStoreGrids } from './store.js?v=1.1.11';
-import { initShop } from './shop.js?v=1.1.11';
-import { initAuth } from './auth.js?v=1.1.11';
-import { initProfile } from './profile.js?v=1.1.11';
-import { initStarredMessages } from './starred-messages.js?v=1.1.11';
-import { initLinkedDevices } from './linked-devices.js?v=1.1.11';
-import { initAppLock } from './app-lock.js?v=1.1.11';
-import { initChatLock } from './chat-lock.js?v=1.1.11';
-import { validateUI } from './ui-validator.js?v=1.1.11';
-import { initHistoryManager } from './history-manager.js?v=1.1.11';
-import { initAccount } from './account.js?v=1.1.11';
-import { initLanguage } from './language.js?v=1.1.11';
-import { initNotificationSettings } from './notifications-settings.js?v=1.1.11';
-import { initStorageSettings } from './storage-settings.js?v=1.1.11';
-import { initHelpFeedback } from './help-feedback.js?v=1.1.11';
-import { showToast } from './toast.js?v=1.1.11';
+import { initNavigation } from './navigation.js';
+import { initChatSelection } from './chat.js';
+import { initStore, refreshStoreGrids } from './store.js';
+import { initShop } from './shop.js';
+import { initAuth } from './auth.js';
+import { initProfile } from './profile.js';
+import { initStarredMessages } from './starred-messages.js';
+import { initLinkedDevices } from './linked-devices.js';
+import { initAppLock } from './app-lock.js';
+import { initChatLock } from './chat-lock.js';
+import { validateUI } from './ui-validator.js';
+import { initHistoryManager } from './history-manager.js';
+import { initAccount } from './account.js';
+import { initLanguage } from './language.js';
+import { initNotificationSettings } from './notifications-settings.js';
+import { initStorageSettings } from './storage-settings.js';
+import { initHelpFeedback } from './help-feedback.js';
+import { initAppVersionChecker } from './version-service.js';
+import { showToast } from './toast.js';
 
 // Monitors browser online/offline status and displays toast notifications
 const initNetworkMonitoring = () => {
@@ -37,6 +38,7 @@ const initNetworkMonitoring = () => {
 
 // Bootstrapping the application
 document.addEventListener('DOMContentLoaded', () => {
+    initAppVersionChecker();
     initNetworkMonitoring();
     initHistoryManager();
     initNavigation();

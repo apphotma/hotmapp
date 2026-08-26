@@ -1,7 +1,7 @@
 import { elements } from './elements.js';
 import { showToast } from './toast.js';
 import { auth } from './firebase-config.js';
-import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js?v=1.1.11';
+import { subscribeToLinkedDevices, authorizeSession, removeLinkedDevice, removeAllLinkedDevices } from './database-service.js';
 import { db } from './firebase-config.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { getRelativeTime } from './utils.js';
@@ -386,9 +386,25 @@ export const initLinkedDevices = () => {
             return;
         }
         if (confirm("Are you sure you want to logout from ALL other devices?")) {
-            // The current device (main) is not in the linkedDevices list, so we can safely clear it.
-            await removeAllLinkedDevices(auth.currentUser.uid);
-            showToast("All other devices have been logged out.", "success");
+            const btn = elements.revokeAllDevicesBtn;
+            if (!btn || btn.disabled) return;
+            const originalHtml = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Unlinking...';
+                // The current device (main) is not in the linkedDevices list, so we can safely clear it.
+                await removeAllLinkedDevices(auth.currentUser.uid);
+                showToast("All other devices have been logged out.", "success");
+            } catch (err) {
+                console.error("Revoke all devices error:", err);
+                showToast("Failed to logout other devices", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
         }
     });
 

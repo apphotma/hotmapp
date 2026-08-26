@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js?v=1.1.11';
+import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateInvitation, revokeAndGenerateInviteToken, getPlatformAnalytics } from './database-service.js';
 import { showToast } from './toast.js';
 import { hideElement, showElement, getAvatarUrl, compressImage, cropToSquare } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
@@ -196,6 +196,10 @@ export const initProfile = () => {
         const user = auth.currentUser;
         if (!user) return;
 
+        const btn = elements.saveChatSettingsBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         const backgroundSettings = {
             backgroundColor: elements.chatBgColorPicker?.value || ''
         };
@@ -213,6 +217,9 @@ export const initProfile = () => {
         };
 
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Saving...';
+
             await updateUserProfile(user.uid, { chatBubbleSettings, chatBackgroundSettings: backgroundSettings, chatMessageSettings });
 
             localStorage.setItem('hotmapp_chat_bg_settings', JSON.stringify(backgroundSettings));
@@ -225,6 +232,11 @@ export const initProfile = () => {
             hideElement(elements.chatSettingsModal);
         } catch (err) {
             showToast("Failed to save settings", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -617,17 +629,27 @@ export const initProfile = () => {
     // Invite Contact Modal Handlers
     elements.settingsInviteContactBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
-        hideElement(elements.settingsModal);
+        const btn = elements.settingsInviteContactBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
 
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:var(--text); width:12px; height:12px; margin:0 6px 0 0;"></span> Loading...';
             showToast("Loading invitation link details...", "info");
             const inviteData = await getOrCreateInvitation(auth.currentUser.uid);
             renderInviteLinkDetails(inviteData);
+            hideElement(elements.settingsModal);
             showElement(elements.inviteContactModal, 'flex');
         } catch (error) {
             console.error("Error displaying invite details:", error);
             showToast("Failed to load invitation details.", "error");
             showElement(elements.settingsModal, 'flex');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -727,10 +749,26 @@ export const initProfile = () => {
 
     elements.settingsAdminAnalyticsBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
-        hideElement(elements.settingsModal);
-        showToast("Fetching analytics...", "info");
-        await loadPlatformAnalytics();
-        showElement(elements.adminAnalyticsModal, 'flex');
+        const btn = elements.settingsAdminAnalyticsBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:var(--text); width:12px; height:12px; margin:0 6px 0 0;"></span> Loading...';
+            showToast("Fetching analytics...", "info");
+            await loadPlatformAnalytics();
+            hideElement(elements.settingsModal);
+            showElement(elements.adminAnalyticsModal, 'flex');
+        } catch (err) {
+            console.error("Failed to load platform analytics:", err);
+            showToast("Error loading analytics statistics", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
     });
 
     elements.refreshAnalyticsBtn?.addEventListener('click', async (e) => {

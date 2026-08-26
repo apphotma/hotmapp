@@ -1,12 +1,12 @@
 import { elements } from './elements.js';
 import { showToast, showActionSuccessAnimation } from './toast.js';
-import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js?v=1.1.11';
+import { saveProduct, subscribeToProducts, deleteProduct, uploadFile, deleteFile, getBusinessProfile, saveBusinessProfile, updateUserProfile, deleteBusinessProfile, getAllUsers, subscribeToAllUsers, sendFriendRequest, getUserProfile, addToChatList, getProductsPage, getProductsByCategory, getProductsBySearch, getProductsByOwner, subscribeToSellerProducts, subscribeToUserProfile } from './database-service.js';
 import { auth, db } from './firebase-config.js';
 import { ref, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { subscribeToAuthChanges } from './auth-service.js';
 import { getAllCachedProducts, cacheItem, getCachedItem } from './cache-manager.js';
 import { getActiveChatUid, moduleFriendsList } from './chat.js';
-import { updateShopPickupLocations, openShopLocationsMapModal } from './shop.js';
+import { updateShopPickupLocations, openShopLocationsMapModal, setSelectedDeliveryCoordinates } from './shop.js';
 import { debounce, fetchWithTimeout, calculateDistance, compressImage, bindDebouncedSearch, parsePrice } from './utils.js';
 import { resolveActiveSellerId } from './shop-seller-utils.js';
 
@@ -127,6 +127,10 @@ const makeCustomDropdownSearchable = (wrapperDataUi, hiddenInputDataUi, triggerD
             renderOptions();
             // Update trigger UI text by running setter
             hiddenInput.value = hiddenInput.value || 'all';
+        },
+        setValue(val) {
+            hiddenInput.value = val;
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
     };
 };
@@ -797,8 +801,8 @@ const populateCountries = async () => {
                     ${data.deliveryCoverage?.countries?.length ? `<p><strong>Countries:</strong> ${data.deliveryCoverage.countries.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.states?.length ? `<p><strong>States:</strong> ${data.deliveryCoverage.states.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.cities?.length ? `<p><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>` : ''}
-                    ${data.deliveryFee ? `<p>Base Fee: ${data.deliveryFee.toFixed(2)}</p>` : ''}
-                    ${data.minFreeDelivery ? `<p>Free Delivery threshold: ${data.minFreeDelivery.toFixed(2)}</p>` : ''}
+                    ${data.deliveryFee ? `<p>Base Fee: ${data.currency || '$'}${data.deliveryFee.toFixed(2)}</p>` : ''}
+                    ${data.minFreeDelivery ? `<p>Free Delivery threshold: ${data.currency || '$'}${data.minFreeDelivery.toFixed(2)}</p>` : ''}
                 </div>
             </div>
         `;
@@ -971,7 +975,7 @@ const renderSellerShopProducts = (products) => {
         const imagesAttr = JSON.stringify(product.images || []);
         const priceHtml = `<span class="product-currency">${product.currency}</span>${parsePrice(product.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
+        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; transform: none; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
         const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
         const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
         const btnHtml = product.soldOut 
@@ -979,7 +983,7 @@ const renderSellerShopProducts = (products) => {
             : '<button class="add-to-cart-btn">Add to Cart</button>';
 
         const shopHtml = `
-            <div class="${cardClass}" data-id="${product.id}" data-images='${imagesAttr}' ${cardStyle}>
+            <div class="${cardClass}" data-id="${product.id}" data-images='${imagesAttr}' ${cardStyle} data-ui="product-card">
                 ${soldOutBadge}
                 <div class="image-loader-wrapper">
                     <div class="spinner"></div>
@@ -1014,9 +1018,44 @@ const renderGeneralMarketProducts = (products) => {
 
     grid.innerHTML = '';
     const userCategories = new Set(); // For category filter dropdown
+    Object.values(allUsersCache).forEach(user => {
+        const sellerProfile = user?.businessProfile;
+        if (sellerProfile && sellerProfile.category) {
+            sellerProfile.category.split(', ').map(s => s.trim()).forEach(catVal => {
+                if (catVal) userCategories.add(catVal);
+            });
+        }
+    });
+
     const sortVal = elements.generalMarketSortSelect?.value || 'name';
 
-    const productList = Object.values(products).sort((a, b) => {
+    const term = elements.generalMarketSearchInput?.value.trim().toLowerCase() || '';
+    const cat = elements.generalMarketCategoryFilter?.value || 'all';
+
+    let filteredList = Object.values(products);
+
+    if (term !== '' || cat !== 'all') {
+        filteredList = filteredList.filter(product => {
+            const name = product.name?.toLowerCase() || '';
+            const desc = product.desc?.toLowerCase() || '';
+            const matchesSearch = term === '' || name.includes(term) || desc.includes(term);
+            
+            let matchesCategory = cat === 'all' || product.category === cat;
+            if (!matchesCategory && cat !== 'all' && product.ownerId) {
+                const sellerProfile = allUsersCache[product.ownerId]?.businessProfile;
+                if (sellerProfile && sellerProfile.category) {
+                    const sellerCategories = sellerProfile.category.split(', ').map(s => s.trim());
+                    if (sellerCategories.includes(cat)) {
+                        matchesCategory = true;
+                    }
+                }
+            }
+            
+            return matchesSearch && matchesCategory;
+        });
+    }
+
+    const productList = filteredList.sort((a, b) => {
         if (sortVal === 'price-low') return (a.price || 0) - (b.price || 0);
         if (sortVal === 'price-high') return (b.price || 0) - (a.price || 0);
         if (sortVal === 'distance') {
@@ -1084,8 +1123,7 @@ const renderGeneralMarketProducts = (products) => {
             }
         }
 
-        // Update unique categories list for filter
-        if (product.category) userCategories.add(product.category);
+
 
         const hasLocations = allUsersCache[product.ownerId]?.businessProfile?.pickupLocations?.length > 0;
         const showMapHtml = (hasLocations && !product.soldOut) ? `<button type="button" class="add-to-cart-btn" data-action="show-on-map" data-owner-id="${product.ownerId}" style="background: white; color: var(--brand-dark); border: 1px solid var(--border); text-decoration: none; text-align: center; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.82rem; height: 36px; padding: 0;"><i class="fa-solid fa-map-location-dot"></i> Show on Map${buttonDist}</button>` : '';
@@ -1107,7 +1145,7 @@ const renderGeneralMarketProducts = (products) => {
             `;
         }
 
-        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
+        const soldOutBadge = product.soldOut ? '<div class="sold-out-badge" style="position: absolute; top: 10px; left: 10px; transform: none; background: #e0a800; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 10; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">READY SOON</div>' : '';
         const cardClass = product.soldOut ? 'product-card is-sold-out' : 'product-card';
         const cardStyle = product.soldOut ? 'style="opacity: 0.65; position: relative;"' : 'style="position: relative;"';
         const btnHtml = product.soldOut 
@@ -1426,6 +1464,10 @@ export const initStore = () => {
         viewLogoInput?.addEventListener('change', handleLogoFileChange);
     };
     setupBusinessLogoUpload();
+    const registrationForm = elements.businessRegistrationModal?.querySelector('form');
+    if (registrationForm) {
+        initCategoryCheckboxes(registrationForm);
+    }
     // Initialize custom category dropdowns
     generalMarketCategoryDropdownControl = makeCustomDropdownSearchable(
         'general-market-category-wrapper',
@@ -1470,6 +1512,47 @@ export const initStore = () => {
     elements.generalMarketNav?.addEventListener('click', checkMarketLocationStatus);
     elements.generalMarketNav?.addEventListener('click', renderRecentlyViewedProducts);
     elements.storeNav?.addEventListener('click', requestUserLocation);
+    elements.storeNav?.addEventListener('click', async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const btn = elements.storeRefreshBtn;
+        const icon = btn?.querySelector('i');
+        if (btn && !btn.disabled) {
+            try {
+                btn.disabled = true;
+                if (icon) icon.classList.add('fa-spin');
+                isLoadingProducts = false;
+                const myProducts = await getProductsByOwner(user.uid);
+                for (const key in cachedProducts) {
+                    if (cachedProducts[key].ownerId === user.uid) {
+                        delete cachedProducts[key];
+                    }
+                }
+                Object.assign(cachedProducts, myProducts);
+                renderGrids(myProducts);
+            } catch (error) {
+                console.error("Failed to auto-refresh store products:", error);
+            } finally {
+                btn.disabled = false;
+                if (icon) icon.classList.remove('fa-spin');
+            }
+        } else {
+            try {
+                isLoadingProducts = false;
+                const myProducts = await getProductsByOwner(user.uid);
+                for (const key in cachedProducts) {
+                    if (cachedProducts[key].ownerId === user.uid) {
+                        delete cachedProducts[key];
+                    }
+                }
+                Object.assign(cachedProducts, myProducts);
+                renderGrids(myProducts);
+            } catch (error) {
+                console.error("Failed to auto-refresh store products fallback:", error);
+            }
+        }
+    });
 
     // Prompt for location when Enable Location button is clicked on warning screen
     document.addEventListener('click', (e) => {
@@ -1529,6 +1612,7 @@ export const initStore = () => {
             }
             Object.assign(cachedProducts, myProducts);
 
+            isLoadingProducts = false;
             // Re-render
             renderGrids(myProducts);
             showToast("Inventory refreshed!", "success");
@@ -1988,11 +2072,6 @@ export const initStore = () => {
                     Object.assign(cachedProducts, localMap);
                     marketProducts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
                     renderGeneralMarketProducts(localMap);
-                    
-                    const keys = marketProducts.map(p => p.id).sort();
-                    if (keys.length > 0) {
-                        lastKey = keys[0];
-                    }
                 }
             }
 
@@ -3578,6 +3657,41 @@ export const initStore = () => {
         });
     });
 
+    const searchAndSelectLocation = async (query) => {
+        if (!query || query.length < 2) return;
+        try {
+            if (elements.businessLocationSearchResults) {
+                elements.businessLocationSearchResults.innerHTML = '<div style="padding:10px 15px; color:var(--muted); font-size:0.85rem;"><span class="spinner" style="border-top-color:var(--brand); width:14px; height:14px; margin:0 8px 0 0;"></span>Searching...</div>';
+                elements.businessLocationSearchResults.style.display = 'block';
+            }
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+            const results = await response.json();
+            if (results && results.length > 0) {
+                const first = results[0];
+                const lat = parseFloat(first.lat);
+                const lon = parseFloat(first.lon);
+                if (businessLocationMap && businessLocationMarker) {
+                    businessLocationMap.setView([lat, lon], 16);
+                    businessLocationMarker.setLatLng([lat, lon]);
+                }
+                if (elements.businessLocationSearchInput) {
+                    elements.businessLocationSearchInput.value = first.display_name;
+                }
+                if (elements.businessLocationSearchResults) {
+                    elements.businessLocationSearchResults.style.display = 'none';
+                }
+                showToast("Location found and map centered!", "info");
+            } else {
+                if (elements.businessLocationSearchResults) {
+                    elements.businessLocationSearchResults.innerHTML = '<div class="location-search-results-item" style="padding:10px 15px; color:var(--muted); font-size:0.85rem;">No results found</div>';
+                }
+                showToast("No location results found for this search.", "warning");
+            }
+        } catch (err) {
+            console.error("Location search error:", err);
+        }
+    };
+
     const performBusinessLocationSearch = debounce(async (query) => {
         if (query.length < 3) {
             if (elements.businessLocationSearchResults) elements.businessLocationSearchResults.style.display = 'none';
@@ -3597,18 +3711,25 @@ export const initStore = () => {
                 container.innerHTML = '<div class="location-search-results-item" style="padding:10px 15px; color:var(--muted); font-size:0.85rem;">No results found</div>';
             } else {
                 container.innerHTML = results.map(res => `
-                    <div class="location-search-results-item" data-lat="${res.lat}" data-lon="${res.lon}">
-                        <i class="fa-solid fa-location-dot" style="color: var(--muted);"></i>
-                        <span>${res.display_name}</span>
+                    <div class="location-search-results-item" data-lat="${res.lat}" data-lon="${res.lon}" style="cursor:pointer; padding:10px 15px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-location-dot" style="color: var(--brand);"></i>
+                        <span style="font-size:0.88rem; color:var(--text);">${res.display_name}</span>
                     </div>
                 `).join('');
             }
             container.style.display = 'block';
         } catch (err) { console.error("Business location search error:", err); }
-    }, 500); // Debounce delay for business location search
+    }, 400);
 
     elements.businessLocationSearchInput?.addEventListener('input', (e) => {
         performBusinessLocationSearch(e.target.value.trim());
+    });
+
+    elements.businessLocationSearchInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchAndSelectLocation(e.target.value.trim());
+        }
     });
 
     elements.businessLocationSearchResults?.addEventListener('click', (e) => {
@@ -3617,7 +3738,7 @@ export const initStore = () => {
         const lat = parseFloat(item.dataset.lat);
         const lon = parseFloat(item.dataset.lon);
         if (businessLocationMap && businessLocationMarker) {
-            businessLocationMap.setView([lat, lon], 15);
+            businessLocationMap.setView([lat, lon], 16);
             businessLocationMarker.setLatLng([lat, lon]);
         }
         if (elements.businessLocationSearchResults) elements.businessLocationSearchResults.style.display = 'none';
@@ -3633,8 +3754,9 @@ export const initStore = () => {
             (position) => {
                 const { latitude, longitude } = position.coords;
                 if (businessLocationMap && businessLocationMarker) {
-                    businessLocationMap.setView([latitude, longitude], 15);
+                    businessLocationMap.setView([latitude, longitude], 16);
                     businessLocationMarker.setLatLng([latitude, longitude]);
+                    reverseGeocodePickerPin(latitude, longitude);
                 }
                 showToast("Map recentered to your location", "info");
             },
@@ -3783,6 +3905,11 @@ export const initStore = () => {
         if (elements.businessRegistrationModal) elements.businessRegistrationModal.style.display = 'none';
     });
 
+    document.querySelectorAll('[data-ui="business-registration-form"]').forEach(bizForm => {
+        setupDeliveryTiersListeners(bizForm);
+        setupCurrencyListeners(bizForm);
+    });
+
     // Shop Access Request Modal Listeners
     elements.closeShopAccessModalBtn?.addEventListener('click', () => {
         if (elements.shopAccessModal) elements.shopAccessModal.style.display = 'none';
@@ -3837,7 +3964,156 @@ export const initStore = () => {
         locationIndexToDelete = -1;
     });
 
+};
 
+/**
+ * Helper to update checkbox selection state and limits based on a category value string
+ */
+const standardCategoryValues = [
+    "Agriculture and Farming",
+    "Animals and Pets",
+    "Beauty and Personal Care",
+    "Commercial Equipment and Tools",
+    "Electronics",
+    "Fashion",
+    "Grocery",
+    "Home Furniture and Appliances",
+    "Pharmacy",
+    "Phone",
+    "Property",
+    "Repair and Construction",
+    "Restaurant",
+    "Service",
+    "Vehicles"
+];
+
+/**
+ * Helper to update checkbox selection state and limits based on a category value string
+ */
+const syncCategoryCheckboxes = (formElement, categoryValue) => {
+    if (!formElement) return;
+    const checkboxesContainer = formElement.querySelector('[data-ui="business-category-checkboxes"]');
+    if (!checkboxesContainer) return;
+
+    const checkboxes = checkboxesContainer.querySelectorAll('input[type="checkbox"]');
+    const customInput = checkboxesContainer.querySelector('[data-ui="custom-category-input"]');
+    
+    const selectedCategories = (categoryValue || '').split(', ').map(s => s.trim()).filter(Boolean);
+    
+    // Find if there's any custom category (not in standardCategoryValues)
+    const customCat = selectedCategories.find(cat => !standardCategoryValues.includes(cat));
+
+    checkboxes.forEach(cb => {
+        if (cb.value === 'Other') {
+            cb.checked = !!customCat;
+        } else {
+            cb.checked = selectedCategories.includes(cb.value);
+        }
+    });
+
+    const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+    const count = checkedBoxes.length;
+
+    const countVal = checkboxesContainer.querySelector('.selected-count-val');
+    if (countVal) countVal.textContent = count;
+
+    checkboxes.forEach(cb => {
+        if (!cb.checked) {
+            cb.disabled = count >= 3;
+        } else {
+            cb.disabled = false;
+        }
+    });
+
+    if (customInput) {
+        if (customCat) {
+            customInput.style.display = 'block';
+            customInput.value = customCat;
+            customInput.required = true;
+        } else {
+            const otherChecked = Array.from(checkboxes).some(cb => cb.value === 'Other' && cb.checked);
+            if (otherChecked) {
+                customInput.style.display = 'block';
+                customInput.required = true;
+            } else {
+                customInput.style.display = 'none';
+                customInput.required = false;
+                customInput.value = '';
+            }
+        }
+    }
+};
+
+/**
+ * Initializes listeners for multi-category checkbox selection in registration/update forms.
+ */
+const initCategoryCheckboxes = (formElement) => {
+    if (!formElement) return;
+    const checkboxesContainer = formElement.querySelector('[data-ui="business-category-checkboxes"]');
+    if (!checkboxesContainer) return;
+
+    const checkboxes = checkboxesContainer.querySelectorAll('input[type="checkbox"]');
+    const hiddenInput = formElement.querySelector('[data-ui="business-category"]');
+    const customInput = checkboxesContainer.querySelector('[data-ui="custom-category-input"]');
+
+    const updateHiddenInput = () => {
+        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+        let selectedList = checkedBoxes.map(cb => cb.value);
+
+        // Replace "Other" with the custom input value in the final array
+        const otherIdx = selectedList.indexOf('Other');
+        if (otherIdx !== -1) {
+            const customVal = customInput?.value.trim() || '';
+            if (customVal) {
+                selectedList[otherIdx] = customVal;
+            } else {
+                selectedList.splice(otherIdx, 1); // Remove it if empty so it doesn't save as "Other" or empty item
+            }
+        }
+
+        const selectedVal = selectedList.filter(Boolean).join(', ');
+
+        if (hiddenInput) {
+            hiddenInput.value = selectedVal;
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // We run a sync to maintain correct counts/limits, but do NOT override the customInput's active typed value!
+        const count = checkedBoxes.length;
+        const countVal = checkboxesContainer.querySelector('.selected-count-val');
+        if (countVal) countVal.textContent = count;
+
+        checkboxes.forEach(cb => {
+            if (!cb.checked) {
+                cb.disabled = count >= 3;
+            } else {
+                cb.disabled = false;
+            }
+        });
+
+        if (customInput) {
+            const otherChecked = Array.from(checkboxes).some(cb => cb.value === 'Other' && cb.checked);
+            if (otherChecked) {
+                customInput.style.display = 'block';
+                customInput.required = true;
+            } else {
+                customInput.style.display = 'none';
+                customInput.required = false;
+                customInput.value = '';
+            }
+        }
+    };
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateHiddenInput);
+    });
+
+    if (customInput) {
+        customInput.addEventListener('input', updateHiddenInput);
+    }
+
+    // Run initial sync from current hiddenInput value
+    syncCategoryCheckboxes(formElement, hiddenInput ? hiddenInput.value : '');
 };
 
 /**
@@ -3855,6 +4131,7 @@ const initializeRegistrationFormUI = (formElement) => {
         deliveryCoverageTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
     refreshLocationUI('pickup'); // Ensure pickup locations are rendered
+    syncCategoryCheckboxes(formElement, formElement.querySelector('[data-ui="business-category"]')?.value || '');
 };
 
 /**
@@ -3868,13 +4145,52 @@ const prepareRegistrationData = (form = null) => {
 
     const serviceType = form.querySelector('[data-ui="service-type"]')?.value;
 
+    // Serialize delivery rules/tiers
+    const rules = [];
+    const tierRows = form.querySelectorAll('.delivery-tier-row');
+    tierRows.forEach(row => {
+        const maxDist = parseFloat(row.querySelector('.tier-distance')?.value);
+        const fee = parseFloat(row.querySelector('.tier-fee')?.value);
+        const minFreeStr = row.querySelector('.tier-min-free')?.value;
+        const minFree = minFreeStr ? parseFloat(minFreeStr) : undefined;
+        
+        if (!isNaN(maxDist) && !isNaN(fee)) {
+            rules.push({
+                maxDistance: maxDist,
+                fee: fee,
+                ...(minFree !== undefined && !isNaN(minFree) ? { minFreeOrder: minFree } : {})
+            });
+        }
+    });
+    // Sort rules by distance ascending
+    rules.sort((a, b) => a.maxDistance - b.maxDistance);
+
+    const useTiers = form.querySelector('[data-ui="use-delivery-tiers"]')?.checked || false;
+    const allowFallback = form.querySelector('[data-ui="allow-fallback"]')?.checked || false;
+    const fallbackFee = parseFloat(form.querySelector('[data-ui="fallback-fee"]')?.value || '0');
+    const fallbackMinFree = form.querySelector('[data-ui="fallback-min-free"]')?.value;
+
+    let selectedCurrency = form.querySelector('[data-ui="store-currency"]')?.value || '$';
+    if (selectedCurrency === 'custom') {
+        selectedCurrency = form.querySelector('[data-ui="custom-store-currency"]')?.value.trim() || '$';
+    }
+    if (selectedCurrency) {
+        localStorage.setItem('hotmapp_last_currency', selectedCurrency);
+    }
+
     pendingBusinessRegistrationData = {
         companyName: form.querySelector('[data-ui="company-name"]')?.value.trim(),
         businessCountry: form.querySelector('[data-ui="business-country"]')?.value,
+        currency: selectedCurrency,
         serviceType: serviceType,
         category: form.querySelector('[data-ui="business-category"]')?.value,
         deliveryFee: parsePrice(form.querySelector('[data-ui="delivery-fee"]')?.value || 0),
         minFreeDelivery: parsePrice(form.querySelector('[data-ui="min-free-delivery"]')?.value || 0),
+        useTiers: useTiers,
+        deliveryRules: rules,
+        allowFallback: allowFallback,
+        fallbackFee: isNaN(fallbackFee) ? 0 : fallbackFee,
+        ...(fallbackMinFree ? { fallbackMinFreeOrder: parseFloat(fallbackMinFree) } : {}),
         pickupLocations: (serviceType === 'pickup' || serviceType === 'both') ? pickupLocations : [],
         visibilityRadius: parseInt(form.querySelector('[data-ui="visibility-radius"]')?.value || '0', 10),
         deliveryCoverage: {
@@ -4028,6 +4344,99 @@ const refreshCitiesList = async (form) => {
     await refreshCities();
 };
 
+const addDeliveryTierRow = (form, tierData = null) => {
+    const list = form.querySelector('[data-ui="delivery-tiers-list"]');
+    if (!list) return;
+
+    const row = document.createElement('div');
+    row.className = 'delivery-tier-row';
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px;';
+    
+    row.innerHTML = `
+        <div style="flex: 1;">
+            <input type="number" step="0.1" min="0" placeholder="e.g. 5 km" title="Max Distance in Kilometers (km)" class="tier-distance" style="padding: 6px 8px; font-size: 0.85rem; width: 100%; border: 1px solid var(--border); border-radius: 4px;" value="${tierData ? tierData.maxDistance : ''}" required>
+        </div>
+        <div style="flex: 1;">
+            <input type="number" step="0.01" min="0" placeholder="e.g. 3.50" title="Delivery Fee ($)" class="tier-fee" style="padding: 6px 8px; font-size: 0.85rem; width: 100%; border: 1px solid var(--border); border-radius: 4px;" value="${tierData ? tierData.fee : ''}" required>
+        </div>
+        <div style="flex: 1.5;">
+            <input type="number" step="0.01" min="0" placeholder="e.g. 50 (Optional)" title="Minimum order amount for free delivery (Optional)" class="tier-min-free" style="padding: 6px 8px; font-size: 0.85rem; width: 100%; border: 1px solid var(--border); border-radius: 4px;" value="${tierData && tierData.minFreeOrder !== undefined ? tierData.minFreeOrder : ''}">
+        </div>
+        <button type="button" class="delete-tier-btn" title="Remove distance tier" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 6px; width: 28px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-trash"></i></button>
+    `;
+
+    row.querySelector('.delete-tier-btn').addEventListener('click', () => {
+        row.remove();
+    });
+
+    list.appendChild(row);
+};
+
+const getFormCurrency = (form) => {
+    if (!form) return '$';
+    const select = form.querySelector('[data-ui="store-currency"]');
+    const custom = form.querySelector('[data-ui="custom-store-currency"]');
+    if (select && select.value === 'custom') {
+        return custom?.value.trim() || '$';
+    }
+    return select?.value || '$';
+};
+
+const updateFormCurrencyDisplay = (form) => {
+    if (!form) return;
+    const sym = getFormCurrency(form);
+    form.querySelectorAll('.delivery-currency-sym').forEach(el => {
+        el.textContent = sym;
+    });
+};
+
+const setupCurrencyListeners = (form) => {
+    if (!form) return;
+    const select = form.querySelector('[data-ui="store-currency"]');
+    const custom = form.querySelector('[data-ui="custom-store-currency"]');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+        if (custom) {
+            custom.style.display = select.value === 'custom' ? 'block' : 'none';
+            if (select.value === 'custom') custom.focus();
+        }
+        updateFormCurrencyDisplay(form);
+    });
+
+    if (custom) {
+        custom.addEventListener('input', () => {
+            updateFormCurrencyDisplay(form);
+        });
+    }
+    updateFormCurrencyDisplay(form);
+};
+
+const setupDeliveryTiersListeners = (form) => {
+    const useTiersCheckbox = form.querySelector('[data-ui="use-delivery-tiers"]');
+    const tiersConfig = form.querySelector('[data-ui="delivery-tiers-config"]');
+    const addTierBtn = form.querySelector('[data-ui="add-delivery-tier-btn"]');
+    const allowFallbackCheckbox = form.querySelector('[data-ui="allow-fallback"]');
+    const fallbackInputs = form.querySelector('[data-ui="fallback-inputs"]');
+
+    if (!useTiersCheckbox || !tiersConfig || !addTierBtn) return;
+
+    useTiersCheckbox.addEventListener('change', () => {
+        tiersConfig.style.display = useTiersCheckbox.checked ? 'block' : 'none';
+    });
+
+    addTierBtn.addEventListener('click', () => {
+        addDeliveryTierRow(form);
+    });
+
+    if (allowFallbackCheckbox && fallbackInputs) {
+        allowFallbackCheckbox.addEventListener('change', () => {
+            fallbackInputs.style.display = allowFallbackCheckbox.checked ? 'flex' : 'none';
+        });
+    }
+    setupCurrencyListeners(form);
+};
+
 /**
  * Populates the business registration form with existing profile data.
  * @param {object} profileData - The business profile data.
@@ -4068,6 +4477,25 @@ const populateBusinessRegistrationForm = async (profileData, formElement) => {
         if (viewIcon) viewIcon.style.display = 'block';
     }
 
+    // Set store currency
+    const currencySelect = formElement.querySelector('[data-ui="store-currency"]');
+    const customCurrencyInput = formElement.querySelector('[data-ui="custom-store-currency"]');
+    const currency = profileData.currency || '$';
+    if (currencySelect) {
+        const hasPreset = Array.from(currencySelect.options).some(opt => opt.value === currency);
+        if (hasPreset) {
+            currencySelect.value = currency;
+            if (customCurrencyInput) customCurrencyInput.style.display = 'none';
+        } else {
+            currencySelect.value = 'custom';
+            if (customCurrencyInput) {
+                customCurrencyInput.value = currency;
+                customCurrencyInput.style.display = 'block';
+            }
+        }
+        updateFormCurrencyDisplay(formElement);
+    }
+
     // Set company name
     const companyNameInput = formElement.querySelector('[data-ui="company-name"]');
     if (companyNameInput) companyNameInput.value = profileData.companyName || '';
@@ -4080,9 +4508,42 @@ const populateBusinessRegistrationForm = async (profileData, formElement) => {
     const minFreeDeliveryInput = formElement.querySelector('[data-ui="min-free-delivery"]');
     if (minFreeDeliveryInput) minFreeDeliveryInput.value = profileData.minFreeDelivery || '';
 
+    // Set useTiers checkbox and toggle view
+    const useTiersCheckbox = formElement.querySelector('[data-ui="use-delivery-tiers"]');
+    const tiersConfig = formElement.querySelector('[data-ui="delivery-tiers-config"]');
+    const tiersList = formElement.querySelector('[data-ui="delivery-tiers-list"]');
+    if (useTiersCheckbox) {
+        useTiersCheckbox.checked = !!profileData.useTiers;
+        if (tiersConfig) tiersConfig.style.display = useTiersCheckbox.checked ? 'block' : 'none';
+    }
+    if (tiersList) {
+        tiersList.innerHTML = '';
+        if (profileData.deliveryRules && Array.isArray(profileData.deliveryRules)) {
+            profileData.deliveryRules.forEach(rule => {
+                addDeliveryTierRow(formElement, rule);
+            });
+        }
+    }
+
+    // Set fallback checkbox and fallback inputs
+    const allowFallbackCheckbox = formElement.querySelector('[data-ui="allow-fallback"]');
+    const fallbackInputs = formElement.querySelector('[data-ui="fallback-inputs"]');
+    const fallbackFeeInput = formElement.querySelector('[data-ui="fallback-fee"]');
+    const fallbackMinFreeInput = formElement.querySelector('[data-ui="fallback-min-free"]');
+
+    if (allowFallbackCheckbox) {
+        allowFallbackCheckbox.checked = !!profileData.allowFallback;
+        if (fallbackInputs) fallbackInputs.style.display = allowFallbackCheckbox.checked ? 'flex' : 'none';
+    }
+    if (fallbackFeeInput) fallbackFeeInput.value = profileData.fallbackFee !== undefined ? profileData.fallbackFee : '';
+    if (fallbackMinFreeInput) fallbackMinFreeInput.value = profileData.fallbackMinFreeOrder !== undefined ? profileData.fallbackMinFreeOrder : '';
+
     // Set category
     const categorySelect = formElement.querySelector('[data-ui="business-category"]');
-    if (categorySelect) categorySelect.value = profileData.category || '';
+    if (categorySelect) {
+        categorySelect.value = profileData.category || '';
+        syncCategoryCheckboxes(formElement, profileData.category || '');
+    }
 
     // Set country
     const countryInput = formElement.querySelector('[data-ui="business-country"]');
@@ -4198,8 +4659,8 @@ const populateReviewContent = () => {
                 ${data.deliveryCoverage?.countries?.length ? `<p><strong>Countries:</strong> ${data.deliveryCoverage.countries.join(', ')}</p>` : ''}
                 ${data.deliveryCoverage?.states?.length ? `<p><strong>States:</strong> ${data.deliveryCoverage.states.join(', ')}</p>` : ''}
                 ${data.deliveryCoverage?.cities?.length ? `<p><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>` : ''}
-                ${data.deliveryFee ? `<p>Base Fee: ${data.deliveryFee.toFixed(2)}</p>` : ''}
-                ${data.minFreeDelivery ? `<p>Free Delivery threshold: ${data.minFreeDelivery.toFixed(2)}</p>` : ''}
+                ${data.deliveryFee ? `<p>Base Fee: ${data.currency || '$'}${data.deliveryFee.toFixed(2)}</p>` : ''}
+                ${data.minFreeDelivery ? `<p>Free Delivery threshold: ${data.currency || '$'}${data.minFreeDelivery.toFixed(2)}</p>` : ''}
             </div>
         </div>
     `;
@@ -4549,7 +5010,6 @@ const refreshLocationUI = (type) => {
 };
 
 export const initBusinessLocationMap = (lat, lng) => {
-    console.log('initBusinessLocationMap entered. Lat:', lat, 'Lng:', lng); // Debug log
     if (typeof L === 'undefined') return;
 
     const brandIcon = L.divIcon({
@@ -4559,61 +5019,119 @@ export const initBusinessLocationMap = (lat, lng) => {
         iconAnchor: [16, 32]
     });
 
+    const validLat = typeof lat === 'number' && !isNaN(lat) ? lat : 0;
+    const validLng = typeof lng === 'number' && !isNaN(lng) ? lng : 0;
+
     if (businessLocationMap) {
-        businessLocationMap.setView([lat, lng], 15, { animate: false });
-        businessLocationMarker.setLatLng([lat, lng]);
-        setTimeout(() => businessLocationMap.invalidateSize(), 200);
+        businessLocationMap.setView([validLat, validLng], 15, { animate: false });
+        if (businessLocationMarker) {
+            businessLocationMarker.setLatLng([validLat, validLng]);
+        }
+        setTimeout(() => {
+            if (businessLocationMap) businessLocationMap.invalidateSize();
+        }, 150);
         return;
     }
 
     const mapContainer = elements.businessLocationMap;
     if (!mapContainer) { console.error('Map container element (elements.businessLocationMap) not found!'); return; }
 
-    businessLocationMap = L.map(mapContainer).setView([lat, lng], 15);
+    businessLocationMap = L.map(mapContainer).setView([validLat, validLng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(businessLocationMap);
 
-    businessLocationMarker = L.marker([lat, lng], {
+    businessLocationMarker = L.marker([validLat, validLng], {
         draggable: true,
         icon: brandIcon
     }).addTo(businessLocationMap);
 
     businessLocationMap.on('click', (e) => {
-        businessLocationMarker.setLatLng(e.latlng);
+        if (businessLocationMarker) businessLocationMarker.setLatLng(e.latlng);
+        reverseGeocodePickerPin(e.latlng.lat, e.latlng.lng);
     });
 
     businessLocationMarker.on('dragend', () => {
-        const { lat, lng } = businessLocationMarker.getLatLng();
-        businessLocationMap.setView([lat, lng], businessLocationMap.getZoom());
+        const { lat: mLat, lng: mLng } = businessLocationMarker.getLatLng();
+        businessLocationMap.setView([mLat, mLng], businessLocationMap.getZoom());
+        reverseGeocodePickerPin(mLat, mLng);
     });
+
+    setTimeout(() => {
+        if (businessLocationMap) businessLocationMap.invalidateSize();
+    }, 200);
+};
+
+const reverseGeocodePickerPin = async (lat, lng) => {
+    try {
+        if (elements.businessLocationSearchInput) {
+            elements.businessLocationSearchInput.placeholder = 'Fetching address...';
+        }
+        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await resp.json();
+        if (data && data.display_name && elements.businessLocationSearchInput) {
+            elements.businessLocationSearchInput.value = data.display_name;
+            elements.businessLocationSearchInput.placeholder = 'Search for a place or address...';
+        }
+    } catch (e) {
+        console.warn("Reverse geocoding failed", e);
+        if (elements.businessLocationSearchInput) {
+            elements.businessLocationSearchInput.placeholder = 'Search for a place or address...';
+        }
+    }
 };
 
 export const openBusinessLocationPicker = (type, locationData = null, index = -1) => {
-    if (type !== 'delivery-address') currentPickingLocationType = type;
+    currentPickingLocationType = type;
 
     if (type === 'pickup' && index === -1 && pickupLocations.length >= MAX_PICKUP_LOCATIONS) {
         showToast(`You can register a maximum of ${MAX_PICKUP_LOCATIONS} pickup locations.`, "warning");
         return;
     }
 
-    // If editing/changing pickup location, pre-load the existing one
-    // The index parameter now correctly indicates if it's an edit or a new location
     currentEditingLocationIndex = index;
-    if (elements.businessLocationPickerModal) elements.businessLocationPickerModal.style.display = 'flex';
+    if (elements.businessLocationPickerModal) {
+        elements.businessLocationPickerModal.dataset.mode = type;
+        elements.businessLocationPickerModal.style.display = 'flex';
+    }
 
-    // Initialize map with current location or default
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => initBusinessLocationMap(locationData?.latitude || position.coords.latitude, locationData?.longitude || position.coords.longitude),
-            () => initBusinessLocationMap(locationData?.latitude || 0, locationData?.longitude || 0) // Default if GPS blocked
-        );
+    // Determine initial coordinates
+    let initLat = locationData?.latitude;
+    let initLng = locationData?.longitude;
+    const hasExplicitCoords = typeof initLat === 'number' && typeof initLng === 'number' && !isNaN(initLat) && !isNaN(initLng) && (initLat !== 0 || initLng !== 0);
+
+    if (hasExplicitCoords) {
+        initBusinessLocationMap(initLat, initLng);
     } else {
-        initBusinessLocationMap(locationData?.latitude || 0, locationData?.longitude || 0);
+        // Fallback default
+        initBusinessLocationMap(0, 0);
+
+        // Try getting real device GPS location asynchronously
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    if (businessLocationMap && businessLocationMarker) {
+                        businessLocationMap.setView([latitude, longitude], 15);
+                        businessLocationMarker.setLatLng([latitude, longitude]);
+                        reverseGeocodePickerPin(latitude, longitude);
+                    }
+                },
+                () => {},
+                { enableHighAccuracy: true, timeout: 6000 }
+            );
+        }
     }
 
     if (elements.businessLocationSearchInput) elements.businessLocationSearchInput.value = locationData?.address || '';
     if (elements.businessLocationSearchResults) elements.businessLocationSearchResults.style.display = 'none';
+
+    setTimeout(() => {
+        if (businessLocationMap) businessLocationMap.invalidateSize();
+    }, 100);
+    setTimeout(() => {
+        if (businessLocationMap) businessLocationMap.invalidateSize();
+    }, 350);
 };
 
 /**
@@ -4641,8 +5159,8 @@ const showRegistrationConfirmation = (data) => {
             <p><strong>Business base:</strong> ${data.businessCountry}</p>
             <p><strong>Category:</strong> ${data.category || 'Not specified'}</p>
             <p><strong>Service Type:</strong> ${data.serviceType.charAt(0).toUpperCase() + data.serviceType.slice(1)}</p>
-            ${data.deliveryFee > 0 ? `<p><strong>Delivery Fee:</strong> ${data.deliveryFee.toFixed(2)}</p>` : ''}
-            ${data.minFreeDelivery > 0 ? `<p><strong>Min Order for Free Delivery:</strong> ${data.minFreeDelivery.toFixed(2)}</p>` : ''}
+            ${data.deliveryFee > 0 ? `<p><strong>Delivery Fee:</strong> ${data.currency || '$'}${data.deliveryFee.toFixed(2)}</p>` : ''}
+            ${data.minFreeDelivery > 0 ? `<p><strong>Min Order for Free Delivery:</strong> ${data.currency || '$'}${data.minFreeDelivery.toFixed(2)}</p>` : ''}
     `;
 
     if (data.pickupLocations && data.pickupLocations.length > 0) {
@@ -4696,17 +5214,25 @@ const handleLocationUiEvent = (e) => {
  * Helper to update the state arrays and UI lists for business locations.
  */
 const updateBusinessLocationState = (location) => {
-    const mode = elements.businessLocationPickerModal?.dataset.mode;
+    const mode = elements.businessLocationPickerModal?.dataset.mode || currentPickingLocationType;
     if (mode === 'delivery-address') {
         const addrMode = elements.deliveryAddressContainer?.dataset.mode || 'simple';
+
+        // Save delivery coordinates for checkout calculations
+        setSelectedDeliveryCoordinates({ lat: location.latitude, lng: location.longitude });
 
         if (addrMode === 'simple') {
             if (elements.deliveryAddressInput) {
                 elements.deliveryAddressInput.value = location.address;
                 elements.deliveryAddressInput.dispatchEvent(new Event('input'));
+                elements.deliveryAddressInput.dispatchEvent(new Event('change'));
             }
         } else {
-            if (elements.addrStreet) elements.addrStreet.value = location.address;
+            if (elements.addrStreet) {
+                elements.addrStreet.value = location.address;
+                elements.addrStreet.dispatchEvent(new Event('input'));
+                elements.addrStreet.dispatchEvent(new Event('change'));
+            }
             showToast("Street set. Please verify City and State.", "info");
         }
         return;
@@ -4725,68 +5251,78 @@ const updateBusinessLocationState = (location) => {
  */
 const handleConfirmLocationSelection = async () => {
     const btn = elements.confirmBusinessLocationBtn;
-    const originalContent = btn.innerHTML;
-    const mode = elements.businessLocationPickerModal?.dataset.mode;
+    const originalContent = btn ? btn.innerHTML : 'Confirm Location';
+    const isDeliveryMode = (elements.businessLocationPickerModal?.dataset.mode === 'delivery-address' || currentPickingLocationType === 'delivery-address');
     const cartBtn = elements.pickDeliveryLocationBtn;
-    const isDeliveryMode = mode === 'delivery-address';
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    }
 
     if (!businessLocationMarker) {
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
         return;
     }
 
-    const { lat, lng } = businessLocationMarker.getLatLng();
-    let address = elements.businessLocationSearchInput.value.trim();
-
-    if (isDeliveryMode && cartBtn) {
-        if (elements.businessLocationPickerModal) elements.businessLocationPickerModal.style.display = 'none';
-        cartBtn.disabled = true;
-        cartBtn.dataset.originalContent = cartBtn.innerHTML;
-        cartBtn.innerHTML = '<span class="spinner" style="width:10px; height:10px; border-width:2px; margin:0;"></span> Geocoding...';
-    }
-
     try {
-        // Reverse geocode if address is empty or just lat/lng
-        if (!address || address === `${lat}, ${lng}`) {
+        let { lat, lng } = businessLocationMarker.getLatLng();
+        let address = elements.businessLocationSearchInput?.value.trim() || '';
+
+        // If user typed an address in the search bar but marker is still default (0,0), geocode the address
+        if (address && (lat === 0 && lng === 0)) {
+            try {
+                const searchResp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
+                const searchData = await searchResp.json();
+                if (searchData && searchData.length > 0) {
+                    lat = parseFloat(searchData[0].lat);
+                    lng = parseFloat(searchData[0].lon);
+                    address = searchData[0].display_name || address;
+                }
+            } catch (e) {
+                console.warn("Geocoding failed", e);
+            }
+        } else if (!address || address === `${lat}, ${lng}`) {
             try {
                 const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                 const data = await resp.json();
-                address = data.display_name || `${lat}, ${lng}`;
+                address = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             } catch (e) {
-                console.warn("Reverse geocoding failed", e);
-                address = `${lat}, ${lng}`;
+                address = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             }
         }
 
         const newLocation = { name: address.split(',')[0], latitude: lat, longitude: lng, address: address };
         updateBusinessLocationState(newLocation);
-        if (!isDeliveryMode) {
-            setTimeout(() => {
-                if (elements.businessLocationPickerModal) {
-                    elements.businessLocationPickerModal.style.display = 'none';
-                    delete elements.businessLocationPickerModal.dataset.mode;
-                }
-                if (elements.businessLocationSearchResults) elements.businessLocationSearchResults.style.display = 'none';
-            }, 50);
+
+        if (isDeliveryMode) {
+            showToast("Delivery address set from map!", "success");
         } else {
-            delete elements.businessLocationPickerModal?.dataset.mode;
-            if (elements.businessLocationSearchResults) elements.businessLocationSearchResults.style.display = 'none';
+            showToast("Location confirmed.", "success");
+        }
+
+        // Close modal cleanly
+        if (elements.businessLocationPickerModal) {
+            elements.businessLocationPickerModal.style.display = 'none';
+            delete elements.businessLocationPickerModal.dataset.mode;
+        }
+        if (elements.businessLocationSearchResults) {
+            elements.businessLocationSearchResults.style.display = 'none';
+            elements.businessLocationSearchResults.innerHTML = '';
+        }
+        if (elements.businessLocationSearchInput) {
+            elements.businessLocationSearchInput.value = '';
         }
     } catch (error) {
         console.error("Error confirming location:", error);
         showToast("Failed to confirm location. Please try again.", "error");
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-
-        if (isDeliveryMode && cartBtn) {
-            cartBtn.disabled = false;
-            cartBtn.innerHTML = cartBtn.dataset.originalContent || '<i class="fa-solid fa-map-location-dot"></i> Pick from Map';
-            delete cartBtn.dataset.originalContent;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
         }
     }
 };

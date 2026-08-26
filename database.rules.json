@@ -110,6 +110,7 @@
     },
     "products": {
       ".read": "true",
+      ".indexOn": ["category"],
       "$productId": {
         "avgRating": {
           ".write": "auth != null"
@@ -187,6 +188,10 @@
     },
     "helpSync": {
       ".read": "true"
+    },
+    "app_config": {
+      ".read": "true",
+      ".write": "auth != null"
     }
   }
 }

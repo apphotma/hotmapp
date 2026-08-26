@@ -1,6 +1,6 @@
 import { elements } from './elements.js';
 import { auth } from './firebase-config.js';
-import { getUserProfile, updateUserProfile } from './database-service.js?v=1.1.11';
+import { getUserProfile, updateUserProfile } from './database-service.js';
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
@@ -344,7 +344,14 @@ export const initLanguage = () => {
             });
         }
 
+        const btn = elements.saveLanguageBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Saving...';
+
             // Apply language translations immediately
             applyLanguage(selectedLang);
 
@@ -365,6 +372,11 @@ export const initLanguage = () => {
         } catch (error) {
             console.error("Error saving preferred language settings:", error);
             showToast("Failed to save language settings", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 

@@ -1,10 +1,10 @@
 import { elements } from './elements.js';
 import { auth, db } from './firebase-config.js';
-import { getUserProfile, updateUserProfile } from './database-service.js?v=1.1.11';
+import { getUserProfile, updateUserProfile } from './database-service.js';
 import { showToast } from './toast.js';
 import { hideElement, showElement } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
-import { uploadFile } from './database-service.js?v=1.1.11';
+import { uploadFile } from './database-service.js';
 import { registerFcmToken, removeFcmToken, initFcmListener } from './fcm-service.js';
 
 // Track if the user has interacted with the page (required for Vibration API)

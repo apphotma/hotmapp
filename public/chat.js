@@ -5,11 +5,11 @@ import { pushHistoryState, removeHistoryState, replaceHistoryState, dismissHisto
 import { auth, db } from './firebase-config.js';
 import { debounce, getRelativeTime, compressImage, getAvatarUrl, isEditableTextMessage } from './utils.js'; // Import utilities
 import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
-import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js?v=1.1.10';
-import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages } from './cache-manager.js';
+import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js';
+import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages, getOrFetchMediaBlobUrl } from './cache-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { refreshStoreGrids } from './store.js';
-import { refreshCart } from './shop.js';
+import { refreshCart, generateOrderInvoiceDoc } from './shop.js';
 import { isChatLocked, toggleChatLock, renderLockedChatsList } from './chat-lock.js';
 import { playIncomingSound, getCallRingtoneUrl } from './notifications-settings.js';
 import { getOrDeriveSharedKey, encryptText, decryptText, getStoredKey } from './crypto-helper.js';
@@ -21,6 +21,29 @@ import { createChatInitializationGate } from './chat-init-state.js';
 
 export const getAllUsersCache = () => allUsersCache;
 export const getCurrentChatListIds = () => currentChatListIds;
+
+export async function loadCachedMediaElements(container = document) {
+    const mediaElements = container.querySelectorAll('[data-media-url]');
+    mediaElements.forEach(async (el) => {
+        const originalUrl = el.getAttribute('data-media-url');
+        if (!originalUrl) return;
+
+        try {
+            const resolvedUrl = await getOrFetchMediaBlobUrl(originalUrl);
+            if (resolvedUrl) {
+                if (el.tagName === 'IMG') {
+                    el.src = resolvedUrl;
+                } else if (el.tagName === 'AUDIO' || el.tagName === 'VIDEO') {
+                    el.src = resolvedUrl;
+                } else if (el.tagName === 'A') {
+                    el.href = resolvedUrl;
+                }
+            }
+        } catch (err) {
+            console.warn("loadCachedMediaElements failed for:", originalUrl, err);
+        }
+    });
+}
 
 const animateRequestFlyer = (startElement) => {
     const targetElement = elements.headerOutgoingRequestsBtn || elements.headerIncomingRequestsBtn || elements.headerRequestsBtn;
@@ -592,7 +615,39 @@ const updatePdfZoomUI = (smooth = false) => {
     }
 };
 
-const renderPdfPagesInline = async (url, container) => {
+export const downloadPdfFile = async (url, fileName = 'Invoice.pdf') => {
+    try {
+        if (!url) return;
+        showToast("Downloading invoice...", "info");
+        if (url.startsWith('blob:') || url.startsWith('data:')) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Invoice downloaded!", "success");
+            return;
+        }
+
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        showToast("Invoice downloaded!", "success");
+    } catch (err) {
+        console.warn("Direct download failed, falling back to window.open", err);
+        window.open(url, '_blank');
+    }
+};
+
+const renderPdfPagesInline = async (urlOrBuffer, container) => {
     let zoomContainer = container.querySelector('.pdf-zoom-container');
     if (!zoomContainer) {
         container.innerHTML = '<div class="pdf-zoom-container"></div>';
@@ -601,10 +656,23 @@ const renderPdfPagesInline = async (url, container) => {
     zoomContainer.innerHTML = '<div class="pdf-loading"><span class="spinner" style="border-top-color: #fff; width: 24px; height: 24px; border-width: 2px;"></span> Rendering document...</div>';
 
     try {
-        const loadingTask = pdfjsLib.getDocument({
-            url: url,
-            withCredentials: false
-        });
+        let loadingTask;
+        if (typeof urlOrBuffer === 'string') {
+            if (urlOrBuffer.startsWith('blob:') || urlOrBuffer.startsWith('data:')) {
+                loadingTask = pdfjsLib.getDocument({ url: urlOrBuffer });
+            } else {
+                // Fetch as arraybuffer to eliminate cross-origin & WebView iframe restrictions
+                try {
+                    const resp = await fetch(urlOrBuffer);
+                    const buf = await resp.arrayBuffer();
+                    loadingTask = pdfjsLib.getDocument({ data: buf });
+                } catch (fetchErr) {
+                    loadingTask = pdfjsLib.getDocument({ url: urlOrBuffer, withCredentials: false });
+                }
+            }
+        } else {
+            loadingTask = pdfjsLib.getDocument({ data: urlOrBuffer });
+        }
 
         const pdf = await loadingTask.promise;
         zoomContainer.innerHTML = '';
@@ -642,11 +710,10 @@ const renderPdfPagesInline = async (url, container) => {
             pagesData.push({ pageNum, wrapper, canvas, spinner });
         }
 
-        // Render pages sequentially, but yielding back to the browser's event loop to prevent UI freezing
+        // Render pages sequentially, yielding to browser to prevent UI freezing
         for (const pageData of pagesData) {
             const { pageNum, wrapper, canvas, spinner } = pageData;
 
-            // Get page
             const page = await pdf.getPage(pageNum);
             const viewport = page.getViewport({ scale });
 
@@ -654,30 +721,28 @@ const renderPdfPagesInline = async (url, container) => {
             canvas.height = viewport.height;
             canvas.width = viewport.width;
 
-            // Render page
             await page.render({
                 canvasContext: context,
                 viewport: viewport
             }).promise;
 
-            // Page rendered! Reveal canvas and remove spinner/loading state
             canvas.style.display = 'block';
             spinner.style.display = 'none';
             wrapper.className = 'pdf-page-wrapper';
-            wrapper.style.minHeight = 'auto'; // Reset min-height
+            wrapper.style.minHeight = 'auto';
 
-            // Yield control back to browser to process touch scrolling and UI updates smoothly
             await new Promise(resolve => setTimeout(resolve, 30));
         }
 
     } catch (err) {
         console.error("PDF inline rendering failed:", err);
+        const fallbackUrl = typeof urlOrBuffer === 'string' ? urlOrBuffer : '#';
         zoomContainer.innerHTML = `
             <div class="pdf-error-fallback">
                 <i class="fa-solid fa-file-circle-exclamation" style="font-size: 3.5rem; color: #ffc107; margin-bottom: 15px; display: block;"></i>
                 <h5 style="margin-bottom: 8px;">Cannot Load Preview</h5>
                 <p style="font-size: 0.9rem; color: #ccc; margin-bottom: 20px;">This browser or server settings prevents loading the preview directly.</p>
-                <a href="${url}" target="_blank" rel="noopener noreferrer" class="btn" style="background: var(--brand); color: white; padding: 10px 20px; font-weight: 600; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow);">
+                <a href="${fallbackUrl}" target="_blank" rel="noopener noreferrer" class="btn" style="background: var(--brand); color: white; padding: 10px 20px; font-weight: 600; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow);">
                     <i class="fa-solid fa-external-link"></i> Open Document Natively
                 </a>
             </div>
@@ -751,81 +816,145 @@ const setupLightboxUI = (msg, url, isProfilePhoto) => {
     }
 };
 
+/**
+ * Views an invoice directly by rendering the jsPDF document client-side.
+ * Works 100% offline, with zero CORS issues or expired URL errors.
+ */
+window.viewChatInvoice = async (invoiceIdOrMsgId) => {
+    try {
+        showToast("Generating invoice preview...", "info");
+        let order = null;
+        let msg = null;
+
+        if (invoiceIdOrMsgId) {
+            order = await getOrder(invoiceIdOrMsgId);
+            if (!order) {
+                msg = messages.find(m => m.id === invoiceIdOrMsgId || m.invoiceId === invoiceIdOrMsgId);
+                if (msg && msg.invoiceId) {
+                    order = await getOrder(msg.invoiceId);
+                }
+            }
+        }
+
+        if (order) {
+            const { doc, blob, blobUrl, orderNumber } = await generateOrderInvoiceDoc(order);
+            const fileName = `Invoice_${orderNumber || order.id || 'HOTMAPP'}.pdf`;
+            window.openPdfViewer(blobUrl, msg?.id || null, fileName, doc);
+            return;
+        }
+
+        if (!msg) {
+            msg = messages.find(m => m.id === invoiceIdOrMsgId);
+        }
+        if (msg && msg.url) {
+            window.openPdfViewer(msg.url, msg.id, msg.fileName || 'Document.pdf');
+        } else {
+            showToast("Could not find invoice details.", "error");
+        }
+    } catch (err) {
+        console.error("Error viewing invoice:", err);
+        showToast("Failed to render invoice preview.", "error");
+    }
+};
 
 /**
- * 
- * Opens the internal PDF viewer modal
- * Defined on window so it can be called from inline onclick handlers
+ * Downloads an invoice directly to disk via jsPDF.
  */
-window.openPdfViewer = async (url, msgId = null) => {
-    if (!url || url === 'null' || url === 'undefined') {
-        showToast('Document is still uploading. Please wait a moment.', 'info');
-        return;
-    }
+window.downloadChatInvoice = async (invoiceIdOrMsgId) => {
+    try {
+        showToast("Preparing invoice download...", "info");
+        let order = null;
+        let msg = null;
 
+        if (invoiceIdOrMsgId) {
+            order = await getOrder(invoiceIdOrMsgId);
+            if (!order) {
+                msg = messages.find(m => m.id === invoiceIdOrMsgId || m.invoiceId === invoiceIdOrMsgId);
+                if (msg && msg.invoiceId) {
+                    order = await getOrder(msg.invoiceId);
+                }
+            }
+        }
+
+        if (order) {
+            const { doc, orderNumber } = await generateOrderInvoiceDoc(order);
+            const fileName = `Invoice_${orderNumber || order.id || 'HOTMAPP'}.pdf`;
+            doc.save(fileName);
+            showToast("Invoice downloaded successfully!", "success");
+            return;
+        }
+
+        if (!msg) {
+            msg = messages.find(m => m.id === invoiceIdOrMsgId);
+        }
+        if (msg && msg.url) {
+            await downloadPdfFile(msg.url, msg.fileName || 'Invoice.pdf');
+        } else {
+            showToast("Could not find invoice file to download.", "error");
+        }
+    } catch (err) {
+        console.error("Error downloading invoice:", err);
+        showToast("Failed to download invoice.", "error");
+    }
+};
+
+/**
+ * Opens the internal PDF viewer modal
+ */
+window.openPdfViewer = async (url, msgId = null, customFileName = null, customDoc = null) => {
     currentPdfZoom = 100;
     updatePdfZoomUI();
 
     let pdfUrl = url;
     const msg = msgId ? messages.find(m => m.id === msgId) : null;
+    let fileName = customFileName || (msg ? msg.fileName : 'Document Preview');
 
-    // Handle background-uploading order invoice PDFs (initially downloadURL is null/empty)
+    // If url is missing or points to an order, try generating the PDF on the fly
     if (!pdfUrl || pdfUrl === 'null' || pdfUrl === 'undefined') {
         if (msg && msg.invoiceId) {
-            showToast("Generating document preview, please wait...", "info");
             try {
-                // Try fetching directly from database to bypass any cached 'null' value
-                const orderSnap = await get(ref(db, `orders/${msg.invoiceId}`));
-                if (orderSnap.exists()) {
-                    const orderData = orderSnap.val();
-                    if (orderData.downloadURL) {
-                        pdfUrl = orderData.downloadURL;
-                        await cacheItem('orders', orderData);
-                    } else {
-                        // If it is still null on the database, listen for changes in real-time
-                        showToast("Document is uploading, please wait a moment...", "info");
-                        pdfUrl = await new Promise((resolve, reject) => {
-                            const orderRef = ref(db, `orders/${msg.invoiceId}/downloadURL`);
-                            const timeoutId = setTimeout(() => {
-                                unsub();
-                                reject(new Error("Timeout waiting for document upload"));
-                            }, 12000);
-
-                            const unsub = onValue(orderRef, (snapshot) => {
-                                const val = snapshot.val();
-                                if (val) {
-                                    clearTimeout(timeoutId);
-                                    unsub();
-                                    resolve(val);
-                                }
-                            });
-                        });
-                        if (pdfUrl) {
-                            const updatedOrder = { ...orderData, downloadURL: pdfUrl };
-                            await cacheItem('orders', updatedOrder);
-                        }
-                    }
+                const order = await getOrder(msg.invoiceId);
+                if (order) {
+                    const result = await generateOrderInvoiceDoc(order);
+                    pdfUrl = result.blobUrl;
+                    fileName = `Invoice_${result.orderNumber}.pdf`;
+                    customDoc = result.doc;
                 }
-            } catch (err) {
-                console.error("Failed to retrieve document URL:", err);
-                showToast("Document is still uploading. Please try again in a few seconds.", "warning");
-                return;
+            } catch (e) {
+                console.warn("Could not generate on-the-fly invoice PDF:", e);
             }
         }
     }
 
     if (!pdfUrl || pdfUrl === 'null' || pdfUrl === 'undefined') {
-        showToast("Document is still uploading. Please try again in a few seconds.", "warning");
+        showToast("Document is not available. Please try again.", "warning");
         return;
     }
 
     if (elements.pdfViewerModal) {
-        if (elements.downloadPdfViewerBtn) elements.downloadPdfViewerBtn.dataset.url = pdfUrl;
-        if (elements.printPdfViewerBtn) elements.printPdfViewerBtn.dataset.url = pdfUrl;
+        if (elements.downloadPdfViewerBtn) {
+            elements.downloadPdfViewerBtn.dataset.url = pdfUrl;
+            elements.downloadPdfViewerBtn.dataset.filename = fileName;
+            elements.downloadPdfViewerBtn.onclick = () => {
+                if (customDoc) {
+                    customDoc.save(fileName);
+                    showToast("Invoice downloaded!", "success");
+                } else {
+                    downloadPdfFile(pdfUrl, fileName);
+                }
+            };
+        }
+        if (elements.printPdfViewerBtn) {
+            elements.printPdfViewerBtn.dataset.url = pdfUrl;
+            elements.printPdfViewerBtn.onclick = () => {
+                window.open(pdfUrl, '_blank');
+            };
+        }
 
         if (elements.pdfViewerTitle) {
-            elements.pdfViewerTitle.textContent = msg ? msg.fileName || 'Document Preview' : 'Document Preview';
+            elements.pdfViewerTitle.textContent = fileName || 'Document Preview';
         }
+
         if (elements.pdfViewerSignBtn) {
             const isSignable = (msg && msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf') && !msg.deleted) ||
                 (msg && msg.type === 'order') ||
@@ -841,8 +970,8 @@ window.openPdfViewer = async (url, msgId = null) => {
                         const signedBlob = await openDocSigner(blob);
                         if (signedBlob) {
                             showToast("Sending signed document...", "info");
-                            const filename = (msg && msg.fileName) ? msg.fileName : (msg && msg.type === 'order' ? `signed_invoice_${msg.id.substring(0, 6)}.pdf` : 'signed_document.pdf');
-                            await sendMedia('document', signedBlob, filename);
+                            const sFilename = (msg && msg.fileName) ? msg.fileName : (msg && msg.type === 'order' ? `signed_invoice_${msg.id.substring(0, 6)}.pdf` : 'signed_document.pdf');
+                            await sendMedia('document', signedBlob, sFilename);
                         }
                     } catch (err) {
                         console.error("Failed to download or sign document:", err);
@@ -855,24 +984,7 @@ window.openPdfViewer = async (url, msgId = null) => {
             }
         }
 
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-
         elements.pdfViewerModal.style.display = 'flex';
-
-        // Show loading spinner while downloading the PDF via storage SDK
-        if (pdfUrl.startsWith('https://firebasestorage.googleapis.com')) {
-            // Temporarily show spinner in container or iframe
-            if (elements.pdfViewerScrollContainer) {
-                elements.pdfViewerScrollContainer.innerHTML = '<div class="pdf-loading"><span class="spinner" style="border-top-color: #fff; width: 24px; height: 24px; border-width: 2px;"></span> Downloading document...</div>';
-                elements.pdfViewerScrollContainer.style.display = 'flex';
-            }
-
-            // Optional: revoke previous object URL if it existed.
-            if (activePdfBlobUrl) {
-                URL.revokeObjectURL(activePdfBlobUrl);
-                activePdfBlobUrl = null;
-            }
-        }
 
         if (elements.pdfViewerScrollContainer) {
             if (elements.pdfViewerIframe) {
@@ -911,10 +1023,11 @@ window.loadAndRenderInvoiceCard = async (msgId, invoiceId, isSent) => {
             `;
         }
 
-        const viewButtonHtml = order.downloadURL ? `
-            <button onclick="openPdfViewer('${order.downloadURL}', '${msgId}')" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; background: white; border: 1px solid var(--border); padding: 5px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600;"><i class="fa-solid fa-file-pdf" style="color: #008069;"></i> View PDF</button>
-        ` : `
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; background: #fff7e6; border: 1px solid #ffe0b2; padding: 5px; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: var(--muted);">Uploading invoice...</div>
+        const viewButtonHtml = `
+            <div style="display: flex; gap: 6px; flex: 1; align-items: center;">
+                <button onclick="window.viewChatInvoice('${order.id || invoiceId || msgId}')" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; background: white; border: 1px solid var(--border); padding: 5px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600;"><i class="fa-solid fa-file-pdf" style="color: #008069;"></i> View PDF</button>
+                <button onclick="window.downloadChatInvoice('${order.id || invoiceId || msgId}')" style="display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600;" title="Download PDF"><i class="fa-solid fa-download" style="color: #008069;"></i></button>
+            </div>
         `;
 
         cardEl.innerHTML = `
@@ -973,6 +1086,18 @@ window.loadAndRenderInvoiceCard = async (msgId, invoiceId, isSent) => {
         cardEl.innerHTML = `<div style="color: var(--muted); font-size: 0.85rem;">Failed to load invoice details.</div>`;
     }
 };
+
+window.addEventListener('order-updated', (e) => {
+    const updatedOrder = e.detail;
+    if (!updatedOrder || !updatedOrder.id) return;
+    const cards = document.querySelectorAll(`[data-invoice-id="${updatedOrder.id}"]`);
+    cards.forEach(card => {
+        const msgId = card.id.replace('invoice-card-', '');
+        const msg = messages.find(m => m.id === msgId);
+        const isSent = msg ? msg.senderId === auth.currentUser?.uid : false;
+        window.loadAndRenderInvoiceCard(msgId, updatedOrder.id, isSent);
+    });
+});
 
 const messages = [];
 const PENDING_MESSAGES_STORAGE_KEY = 'hotmapp_pending_messages';
@@ -1118,6 +1243,7 @@ let callTimeoutId = null;
 let isSettingRemoteDescription = false;
 let isScreenSharing = false;
 let screenStream = null;
+let remoteScreenSharing = new Map();
 const rtcConfig = {
     iceServers: [
         {
@@ -3684,6 +3810,13 @@ const playRemoteStream = (targetUid, stream, type) => {
             videoEl.play().catch(err => console.warn(`Remote video play blocked for ${targetUid}:`, err));
         }
 
+        // Ensure playback resumes when the remote video track starts receiving packets (e.g. after replaceTrack)
+        stream.getVideoTracks().forEach(track => {
+            track.onunmute = () => {
+                videoEl.play().catch(err => console.warn(`Remote video play failed on unmute for ${targetUid}:`, err));
+            };
+        });
+
         // Hide default static remote video element
         if (elements.remoteVideo) {
             elements.remoteVideo.style.display = 'none';
@@ -3712,22 +3845,37 @@ const adjustVideoContainerLayout = () => {
         elements.videoContainer.style.gridTemplateRows = '1fr';
         remoteVideos[0].style.width = '100%';
         remoteVideos[0].style.height = '100%';
-        remoteVideos[0].style.objectFit = 'cover';
-    } else if (total === 2) {
-        elements.videoContainer.style.gridTemplateColumns = '1fr';
-        elements.videoContainer.style.gridTemplateRows = '1fr 1fr';
-        remoteVideos.forEach(v => {
-            v.style.width = '100%';
-            v.style.height = '100%';
-            v.style.objectFit = 'cover';
-        });
+        
+        const targetUid = remoteVideos[0].id.replace('remote-video-', '');
+        const stream = remoteVideos[0].srcObject;
+        const isScreenShare = (remoteScreenSharing.get(targetUid) === true) || (stream && stream.getVideoTracks && stream.getVideoTracks().some(track => {
+            const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
+            const label = track.label ? track.label.toLowerCase() : '';
+            return settings.displaySurface || label.includes('screen') || label.includes('window') || label.includes('monitor');
+        }));
+        remoteVideos[0].style.objectFit = isScreenShare ? 'contain' : 'cover';
+        remoteVideos[0].style.background = isScreenShare ? '#000' : '';
     } else {
-        elements.videoContainer.style.gridTemplateColumns = '1fr 1fr';
-        elements.videoContainer.style.gridTemplateRows = 'auto';
+        if (total === 2) {
+            elements.videoContainer.style.gridTemplateColumns = '1fr';
+            elements.videoContainer.style.gridTemplateRows = '1fr 1fr';
+        } else {
+            elements.videoContainer.style.gridTemplateColumns = '1fr 1fr';
+            elements.videoContainer.style.gridTemplateRows = 'auto';
+        }
         remoteVideos.forEach(v => {
             v.style.width = '100%';
             v.style.height = '100%';
-            v.style.objectFit = 'cover';
+            
+            const targetUid = v.id.replace('remote-video-', '');
+            const stream = v.srcObject;
+            const isScreenShare = (remoteScreenSharing.get(targetUid) === true) || (stream && stream.getVideoTracks && stream.getVideoTracks().some(track => {
+                const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
+                const label = track.label ? track.label.toLowerCase() : '';
+                return settings.displaySurface || label.includes('screen') || label.includes('window') || label.includes('monitor');
+            }));
+            v.style.objectFit = isScreenShare ? 'contain' : 'cover';
+            v.style.background = isScreenShare ? '#000' : '';
         });
     }
 };
@@ -4134,6 +4282,7 @@ const endCall = async () => {
         screenStream = null;
     }
     isScreenSharing = false;
+    remoteScreenSharing.clear();
     if (elements.callScreenShareBtn) {
         elements.callScreenShareBtn.style.display = 'none';
         elements.callScreenShareBtn.classList.remove('active');
@@ -4159,6 +4308,14 @@ const endCall = async () => {
         elements.callCamMuteBtn.style.display = 'none';
         elements.callCamMuteBtn.classList.remove('active');
         elements.callCamMuteBtn.innerHTML = '<i class="fa-solid fa-video"></i>';
+    }
+
+    if (elements.callMuteBtn) {
+        elements.callMuteBtn.classList.remove('active');
+        elements.callMuteBtn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+    }
+    if (elements.minimizedMuteBtn) {
+        elements.minimizedMuteBtn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
     }
 
     if (elements.callSpeakerBtn) {
@@ -4337,7 +4494,9 @@ const toggleSpeaker = async () => {
         document.querySelectorAll('video[id^="remote-video-"]').forEach(el => allAudioElements.push(el));
 
         for (const el of allAudioElements) {
-            await el.setSinkId(targetId);
+            if (typeof el.setSinkId === 'function') {
+                await el.setSinkId(targetId);
+            }
         }
 
         if (elements.callSpeakerBtn) elements.callSpeakerBtn.classList.toggle('active', isSpeakerOn);
@@ -4423,14 +4582,32 @@ const switchMicrophone = async (deviceId) => {
 const startScreenSharing = async () => {
     if (isScreenSharing || peerConnections.size === 0) return;
 
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        showToast("Screen sharing is not supported on this device/platform.", "warning");
+        return;
+    }
+
     try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        // Show a helpful guidance toast to prevent user confusion with native browser screen selection UI
+        showToast("Please click/select the screen thumbnail in the browser popup, then click Share.", "info", 6000);
+
+        // Limit screen resolution to 1080p max to prevent Android hardware encoder from crashing on portrait screens
+        const screenConstraints = {
+            video: {
+                width: { max: 1920 },
+                height: { max: 1080 },
+                frameRate: { ideal: 15, max: 30 }
+            }
+        };
+
+        screenStream = await navigator.mediaDevices.getDisplayMedia(screenConstraints);
         const screenTrack = screenStream.getVideoTracks()[0];
 
         screenTrack.onended = () => {
             stopScreenSharing();
         };
 
+        // Replace the track on all peer connections first while the camera track is still active
         peerConnections.forEach((pc, targetUid) => {
             const sender = pc.getSenders().find(s => s.track?.kind === 'video');
             if (sender) {
@@ -4439,6 +4616,16 @@ const startScreenSharing = async () => {
                 });
             }
         });
+
+        // Swap the tracks in localStream after replacing them to prevent any active transceiver race conditions
+        if (localStream) {
+            const cameraTrack = localStream.getVideoTracks()[0];
+            if (cameraTrack) {
+                cameraTrack.stop();
+                localStream.removeTrack(cameraTrack);
+            }
+            localStream.addTrack(screenTrack);
+        }
 
         if (elements.localVideo) {
             elements.localVideo.srcObject = screenStream;
@@ -4451,10 +4638,34 @@ const startScreenSharing = async () => {
             elements.callScreenShareBtn.classList.add('active');
             elements.callScreenShareBtn.title = "Stop Screen Share";
         }
+
+        // If the camera was muted, automatically mark it as unmuted since we are sharing screen video
+        if (isCameraMuted) {
+            isCameraMuted = false;
+            if (elements.callCamMuteBtn) {
+                elements.callCamMuteBtn.classList.remove('active');
+                elements.callCamMuteBtn.innerHTML = '<i class="fa-solid fa-video"></i>';
+            }
+            callParticipants.forEach(pUid => {
+                sendCallSignal(pUid, auth.currentUser.uid, {
+                    status: 'camera-unmuted',
+                    from: auth.currentUser.uid
+                });
+            });
+        }
+
+        // Send screen sharing started signal to participants
+        callParticipants.forEach(pUid => {
+            sendCallSignal(pUid, auth.currentUser.uid, {
+                status: 'screen-sharing-started',
+                from: auth.currentUser.uid
+            });
+        });
+
         showToast("Screen sharing started", "info");
     } catch (err) {
         console.error("Error starting screen share:", err);
-        showToast("Could not share screen", "error");
+        showToast(`Could not share screen: ${err.message || err}`, "error", 6000);
         isScreenSharing = false;
         if (screenStream) {
             screenStream.getTracks().forEach(track => track.stop());
@@ -4516,6 +4727,14 @@ const stopScreenSharing = async () => {
                 }
             }
         }
+        // Send screen sharing stopped signal to participants
+        callParticipants.forEach(pUid => {
+            sendCallSignal(pUid, auth.currentUser.uid, {
+                status: 'screen-sharing-stopped',
+                from: auth.currentUser.uid
+            });
+        });
+
         showToast("Screen sharing stopped", "info");
     } catch (err) {
         console.error("Error restoring camera after screen share:", err);
@@ -5396,6 +5615,32 @@ const handleSingleSignal = async (senderUid, signal) => {
         if (elements.remoteMuteOverlay) elements.remoteMuteOverlay.style.display = 'flex';
     } else if (signal.status === 'camera-unmuted') {
         if (elements.remoteMuteOverlay) elements.remoteMuteOverlay.style.display = 'none';
+    } else if (signal.status === 'screen-sharing-started') {
+        remoteScreenSharing.set(senderUid, true);
+        adjustVideoContainerLayout();
+        const videoId = `remote-video-${senderUid}`;
+        const videoEl = document.getElementById(videoId);
+        if (videoEl) {
+            const src = videoEl.srcObject;
+            if (src) {
+                videoEl.srcObject = null;
+                videoEl.srcObject = src;
+                videoEl.play().catch(e => console.warn("Play failed on screen share start:", e));
+            }
+        }
+    } else if (signal.status === 'screen-sharing-stopped') {
+        remoteScreenSharing.set(senderUid, false);
+        adjustVideoContainerLayout();
+        const videoId = `remote-video-${senderUid}`;
+        const videoEl = document.getElementById(videoId);
+        if (videoEl) {
+            const src = videoEl.srcObject;
+            if (src) {
+                videoEl.srcObject = null;
+                videoEl.srcObject = src;
+                videoEl.play().catch(e => console.warn("Play failed on screen share stop:", e));
+            }
+        }
     } else if (signal.status === 'busy') {
         clearTimeout(callTimeoutId);
         try {
@@ -5541,7 +5786,7 @@ const hideEditPreview = () => {
 };
 
 // Initialize a WhatsApp-style custom audio player
-const initCustomAudioPlayer = (messageId, audioUrl) => {
+const initCustomAudioPlayer = async (messageId, audioUrl) => {
     const groupEl = document.getElementById(messageId);
     if (!groupEl) return;
 
@@ -5553,7 +5798,8 @@ const initCustomAudioPlayer = (messageId, audioUrl) => {
     const durationText = playerEl.querySelector('.wa-duration');
     const speedBtn = playerEl.querySelector('.wa-speed-btn');
 
-    const audio = new Audio(audioUrl);
+    const resolvedUrl = await getOrFetchMediaBlobUrl(audioUrl);
+    const audio = new Audio(resolvedUrl);
     let speed = 1.0;
     let previewAudio = null; // Local speed cache
 
@@ -5918,7 +6164,7 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                                 </div>
                             </div>
                         ` : '<div class="spinner"></div>'}
-                        <img src="${displayUrl}" data-full-url="${msg.url}" class="message-image" alt="Image" draggable="false" onload="this.classList.add('loaded'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';" onerror="this.classList.add('error'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';">
+                        <img src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/&gt;" data-media-url="${displayUrl}" data-full-url="${msg.url}" class="message-image" alt="Image" draggable="false" onload="this.classList.add('loaded'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';" onerror="this.classList.add('error'); if(this.previousElementSibling && !this.previousElementSibling.classList.contains('media-upload-overlay')) this.previousElementSibling.style.display='none';">
                     </div>
                 `;
                 break;
@@ -5928,7 +6174,7 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 const isVideoSending = msg.status === 'sending';
                 contentHtml = `
                     <div class="video-loader-placeholder" data-full-url="${msg.url}" style="position: relative; max-width: 330px; cursor: pointer; border-radius: 8px; overflow: hidden;">
-                        ${videoDisplayUrl ? `<img src="${videoDisplayUrl}" class="video-thumb" style="width: 100%; display: block; filter: brightness(0.7);">` : `<div style="width: 180px; height: 120px; background: #262626; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-video" style="font-size: 2rem;"></i></div>`}
+                        ${videoDisplayUrl ? `<img src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/&gt;" data-media-url="${videoDisplayUrl}" class="video-thumb" style="width: 100%; display: block; filter: brightness(0.7);">` : `<div style="width: 180px; height: 120px; background: #262626; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-video" style="font-size: 2rem;"></i></div>`}
                         ${isVideoSending ? `
                             <div class="media-upload-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 2;">
                                 <div class="media-upload-spinner-container" style="position: relative; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); border-radius: 50%;">
@@ -5976,8 +6222,18 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
 
                 const isDocSending = msg.status === 'sending';
                 const hasValidUrl = msg.url && msg.url !== 'null' && msg.url !== 'undefined';
-                const documentPreviewHtml = (hasValidUrl && !isDocSending) ? `
-                    <a href="${msg.url}" target="_blank" rel="noopener noreferrer" class="document-preview">
+                const documentPreviewHtml = isInvoiceOrderMessage ? `
+                    <div onclick="window.viewChatInvoice('${msg.invoiceId || msg.id}')" class="document-preview" style="cursor: pointer;">
+                        <div class="document-icon-wrapper">
+                            <span><i class="fa-solid fa-file-pdf" style="color: #008069;"></i></span>
+                        </div>
+                        <div class="document-info">
+                            <span class="document-name">${msg.fileName || 'Invoice.pdf'}</span>
+                            <span class="document-meta">${formatFileSize(msg.fileSize)} • Tap to view</span>
+                        </div>
+                    </div>
+                ` : ((hasValidUrl && !isDocSending) ? `
+                    <a href="${msg.url}" data-media-url="${msg.url}" target="_blank" rel="noopener noreferrer" class="document-preview">
                         <div class="document-icon-wrapper">
                             <span>${getFileIcon(msg.fileName)}</span>
                         </div>
@@ -5997,7 +6253,7 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                         </div>
                         <div class="spinner inline-media-spinner" style="width: 16px; height: 16px; border: 2px solid rgba(0, 0, 0, 0.1); border-top-color: var(--brand-dark); border-radius: 50%; animation: spin 1s linear infinite; margin-left: auto; margin-right: 8px;"></div>
                     </div>
-                `;
+                `);
 
                 let pdfPreviewHtml = '';
                 if (isPdf && !isInvoiceOrderMessage) {
@@ -6205,6 +6461,11 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
 
     if (insertAtTop) elements.messagesContainer.insertAdjacentHTML('afterbegin', html);
     else elements.messagesContainer.insertAdjacentHTML('beforeend', html);
+
+    const newlyInsertedMessage = document.getElementById(msg.id);
+    if (newlyInsertedMessage) {
+        loadCachedMediaElements(newlyInsertedMessage);
+    }
 
     // Initialize custom voice note player
     if (msg.type === 'audio' && !msg.deleted) {
@@ -8847,6 +9108,7 @@ export const initChatSelection = () => {
         const name = item.querySelector('.conversation-name')?.textContent?.trim();
         const avatarEl = item.querySelector('.conversation-avatar');
         activeChatUid = otherUid;
+        hideReplyPreview();
 
         // Multitasking: Auto-minimize active call when switching chats
         if (peerConnections.size > 0) toggleCallMinimize(true);
@@ -9367,6 +9629,12 @@ export const initChatSelection = () => {
         if (!item) return;
 
         const action = item.dataset.action;
+        
+        // If navigating to a tab/view, prevent the dropdown close from triggering browser history back navigation
+        if (action === 'store' || action === 'starred') {
+            elements.headerDropdownMenu.dataset.skipBack = 'true';
+        }
+        
         elements.headerDropdownMenu.style.display = 'none'; // Close the menu
 
         switch (action) {
@@ -9390,6 +9658,7 @@ export const initChatSelection = () => {
                 if (elements.linkedDevicesModal) {
                     elements.linkedDevicesModal.style.display = 'flex';
                 }
+                break;
             case 'store':
                 if (typeof window.openStoreView === 'function') {
                     window.openStoreView();
@@ -10261,7 +10530,13 @@ export const initChatSelection = () => {
     elements.callRetryBtn?.addEventListener('click', retryCallHandshake);
     elements.callMuteBtn?.addEventListener('click', toggleCallMute);
     elements.callAddUserBtn?.addEventListener('click', showAddParticipantModal);
-    elements.callScreenShareBtn?.addEventListener('click', toggleScreenSharing);
+    // Delegate screen share click handling to option container level to support larger touch targets and prevent race conditions
+    document.addEventListener('click', (e) => {
+        const item = e.target.closest('[data-option="screen-share"]');
+        if (item) {
+            toggleScreenSharing();
+        }
+    });
 
     // Call More Options Bottom Sheet
     elements.callMoreBtn?.addEventListener('click', (e) => {
@@ -10732,6 +11007,7 @@ export const initChatSelection = () => {
             if (elements.chatHeaderName) elements.chatHeaderName.textContent = '';
             if (elements.chatHeaderAvatar) elements.chatHeaderAvatar.innerHTML = '';
             activeChatUid = null;
+            hideReplyPreview();
             if (elements.chatArea) elements.chatArea.classList.remove('active-chat-selected');
             if (elements.messageInputArea) elements.messageInputArea.style.display = 'none';
             if (elements.chatActions) elements.chatActions.style.display = 'none';
@@ -11307,7 +11583,14 @@ export const initChatSelection = () => {
     elements.groupInfoAddMemberBtn?.addEventListener('click', async () => {
         if (!activeGroupInfoId || !elements.addParticipantModal || !elements.addParticipantList) return;
 
+        const btn = elements.groupInfoAddMemberBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Loading...';
+
             const groupSnapshot = await get(ref(db, `groups/${activeGroupInfoId}`));
             if (!groupSnapshot.exists()) return;
             const groupData = groupSnapshot.val();
@@ -11355,6 +11638,11 @@ export const initChatSelection = () => {
         } catch (error) {
             console.error("Error opening add participant modal:", error);
             showToast("Failed to fetch contacts", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -11381,6 +11669,14 @@ export const initChatSelection = () => {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
+        const submitBtn = elements.addParticipantForm.querySelector('button[type="submit"]');
+        let originalHtml = "";
+        if (submitBtn) {
+            originalHtml = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Adding...';
+        }
+
         try {
             showToast("Adding participants...", "info");
             await addGroupMembers(activeGroupInfoId, selectedIds, currentUser.uid);
@@ -11391,6 +11687,11 @@ export const initChatSelection = () => {
         } catch (err) {
             console.error("Error adding members:", err);
             showToast("Failed to add participants", "error");
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -11409,7 +11710,14 @@ export const initChatSelection = () => {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
+        const btn = elements.actionMakeAdminBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Updating...';
+
             const groupSnapshot = await get(ref(db, `groups/${activeGroupInfoId}`));
             if (!groupSnapshot.exists()) return;
             const groupData = groupSnapshot.val();
@@ -11429,6 +11737,11 @@ export const initChatSelection = () => {
         } catch (err) {
             console.error("Error toggling admin status:", err);
             showToast("Action failed", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -11440,7 +11753,14 @@ export const initChatSelection = () => {
 
         if (!confirm("Are you sure you want to remove this participant from the group?")) return;
 
+        const btn = elements.actionRemoveMemberBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Removing...';
+
             await removeGroupMember(activeGroupInfoId, selectedMemberIdForAction, currentUser.uid);
             showToast("Participant removed from group", "success");
 
@@ -11449,6 +11769,11 @@ export const initChatSelection = () => {
         } catch (err) {
             console.error("Error removing member:", err);
             showToast("Failed to remove participant", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -11546,7 +11871,14 @@ export const initChatSelection = () => {
 
         if (!confirm("Are you sure you want to exit this group?")) return;
 
+        const btn = elements.groupInfoExitBtn;
+        if (!btn || btn.disabled) return;
+        const originalHtml = btn.innerHTML;
+
         try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Exiting...';
+
             await exitGroup(activeGroupInfoId, currentUser.uid);
             showToast("You left the group", "success");
 
@@ -11559,6 +11891,11 @@ export const initChatSelection = () => {
         } catch (err) {
             console.error("Error exiting group:", err);
             showToast("Failed to exit group", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     });
 
@@ -11910,9 +12247,25 @@ export const initChatSelection = () => {
     elements.unblockAllBtn?.addEventListener('click', async () => {
         const user = auth.currentUser;
         if (user && confirm("Are you sure you want to unblock ALL users?")) {
-            await unblockAllUsers(user.uid);
-            showToast("All users unblocked", "success");
-            renderBlockedUsersList();
+            const btn = elements.unblockAllBtn;
+            if (!btn || btn.disabled) return;
+            const originalHtml = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="border-top-color:white; width:12px; height:12px; margin:0 6px 0 0;"></span> Unblocking...';
+                await unblockAllUsers(user.uid);
+                showToast("All users unblocked", "success");
+                renderBlockedUsersList();
+            } catch (err) {
+                console.error("Unblock all error:", err);
+                showToast("Failed to unblock users", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
         }
     });
 
@@ -12383,7 +12736,7 @@ export const initChatSelection = () => {
     });
 
     // Lightbox image/video view implementation for chat messages
-    const openLightboxImage = (url, msg = null, isProfilePhoto = false) => {
+    const openLightboxImage = async (url, msg = null, isProfilePhoto = false) => {
         if (!msg) {
             isProfilePhoto = true;
         }
@@ -12415,7 +12768,8 @@ export const initChatSelection = () => {
                 imgEl.onerror = null;
             };
 
-            imgEl.src = url;
+            const resolvedUrl = await getOrFetchMediaBlobUrl(url);
+            imgEl.src = resolvedUrl;
             imgEl.style.display = 'block';
         }
 
@@ -12555,7 +12909,7 @@ export const initChatSelection = () => {
     };
     window.openLightboxImage = openLightboxImage;
 
-    const openLightboxVideo = (url, msg = null) => {
+    const openLightboxVideo = async (url, msg = null) => {
         window.currentLightboxImages = [];
         window.currentLightboxIndex = 0;
         const imgEl = elements.lightboxImage;
@@ -12567,7 +12921,8 @@ export const initChatSelection = () => {
         }
 
         if (videoEl) {
-            videoEl.src = url;
+            const resolvedUrl = await getOrFetchMediaBlobUrl(url);
+            videoEl.src = resolvedUrl;
             videoEl.style.display = 'block';
             videoEl.load();
             videoEl.play().catch(e => console.log('Video autoplay blocked:', e));
@@ -13104,11 +13459,12 @@ const openDocSigner = (file) => {
 
         modal.style.display = 'flex';
 
-        // Render first page
+        // Render last page (where the signature block is located)
         const arrayBuffer = await file.arrayBuffer();
         const pdfjsData = arrayBuffer.slice(0);
         const pdf = await pdfjsLib.getDocument({ data: pdfjsData }).promise;
-        const page = await pdf.getPage(1);
+        const lastPageIndex = pdf.numPages;
+        const page = await pdf.getPage(lastPageIndex);
         const viewport = page.getViewport({ scale: 1.0 });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -13301,8 +13657,8 @@ const openDocSigner = (file) => {
                 const pdfLibDoc = await PDFLib.PDFDocument.load(new Uint8Array(arrayBuffer));
                 const pngImage = await pdfLibDoc.embedPng(new Uint8Array(pngArrayBuf));
                 const pages = pdfLibDoc.getPages();
-                const firstPage = pages[0];
-                const { width: pdfWidth, height: pdfHeight } = firstPage.getSize();
+                const lastPage = pages[pages.length - 1];
+                const { width: pdfWidth, height: pdfHeight } = lastPage.getSize();
 
                 // Place signature at the exact mapped coordinate (PDF origin is bottom-left)
                 const x = bbox.x;
@@ -13310,7 +13666,7 @@ const openDocSigner = (file) => {
                 const sigWidth = bbox.w;
                 const sigHeight = bbox.h;
 
-                firstPage.drawImage(pngImage, { x, y, width: sigWidth, height: sigHeight });
+                lastPage.drawImage(pngImage, { x, y, width: sigWidth, height: sigHeight });
 
                 const newPdfBytes = await pdfLibDoc.save();
                 const signedBlob = new Blob([newPdfBytes], { type: 'application/pdf' });
@@ -13389,8 +13745,8 @@ const openChatInvoicesModal = async () => {
 
         const invoiceMessages = [];
         for (const msg of allMsgs) {
-            const isInvoice = msg.type === 'invoice';
-            const isPdfInvoice = msg.type === 'document' && msg.fileName && msg.fileName.startsWith('Invoice_');
+            const isInvoice = msg.type === 'invoice' || msg.type === 'order' || !!msg.invoiceId;
+            const isPdfInvoice = msg.type === 'document' && msg.fileName && (msg.fileName.toLowerCase().includes('invoice') || msg.fileName.startsWith('Invoice_'));
             if (isInvoice || isPdfInvoice) {
                 const decrypted = await decryptMessageInPlace({ ...msg });
                 invoiceMessages.push(decrypted);
@@ -13425,39 +13781,64 @@ const openChatInvoicesModal = async () => {
             let totalText = '';
             let fileText = '';
 
-            if (msg.type === 'invoice' && invoiceId) {
-                const order = await getOrder(invoiceId);
-                if (order) {
-                    if (order.status === 'confirmed') isConfirmed = true;
-                    totalText = `${order.currency}${parseFloat(order.total).toFixed(2)}`;
-                    totalHtml = `<span style="font-weight: 700; color: var(--brand-dark);">${totalText}</span>`;
-                    orderNoText = order.orderNumber || invoiceId.substring(0, 8).toUpperCase();
-                    detailsHtml = `
-                        <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px;">
-                            Order Number: <strong>${orderNoText}</strong>
-                        </div>
-                    `;
-                    viewButtonHtml = `
-                        <button onclick="openPdfViewer('${order.downloadURL}', '${msg.id}')" 
+            let order = null;
+            if (invoiceId) {
+                order = await getOrder(invoiceId);
+            } else if (msg.type === 'order' || msg.id) {
+                order = await getOrder(msg.id);
+            }
+
+            if (order) {
+                if (order.status === 'confirmed' || order.orderConfirmed) isConfirmed = true;
+                totalText = `${order.currency || '$'}${parseFloat(order.total || 0).toFixed(2)}`;
+                totalHtml = `<span style="font-weight: 700; color: var(--brand-dark);">${totalText}</span>`;
+                orderNoText = order.orderNumber || (invoiceId ? invoiceId.substring(0, 8).toUpperCase() : 'INVOICE');
+                const subtotalText = order.subtotal ? `Items: ${order.currency || '$'}${parseFloat(order.subtotal).toFixed(2)}` : '';
+                const deliveryText = order.deliveryMethod === 'delivery'
+                    ? (order.shipping > 0 ? `Delivery: ${order.currency || '$'}${parseFloat(order.shipping).toFixed(2)}` : 'Delivery: FREE')
+                    : 'Self Pickup';
+                detailsHtml = `
+                    <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px;">
+                        Order Number: <strong>${orderNoText}</strong>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                        ${subtotalText ? `${subtotalText} • ` : ''}${deliveryText}
+                    </div>
+                `;
+                viewButtonHtml = `
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button onclick="window.downloadChatInvoice('${order.id || invoiceId || msg.id}')" 
+                            title="Download PDF"
+                            style="background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                        <button onclick="window.viewChatInvoice('${order.id || invoiceId || msg.id}')" 
                             style="background: var(--brand-light); color: var(--brand-dark); border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
                             <i class="fa-solid fa-file-pdf"></i> View PDF
                         </button>
-                    `;
-                }
-            } else if (msg.type === 'document') {
+                    </div>
+                `;
+            } else if (msg.type === 'document' || msg.url) {
                 totalText = formatFileSize(msg.fileSize);
                 totalHtml = `<span style="font-size: 0.78rem; color: var(--muted);">${totalText}</span>`;
-                fileText = msg.fileName;
+                fileText = msg.fileName || 'Invoice.pdf';
                 detailsHtml = `
                     <div style="font-size: 0.78rem; color: var(--muted); font-weight: 500; margin-top: 2px;">
                         File: <strong>${fileText}</strong>
                     </div>
                 `;
                 viewButtonHtml = `
-                    <button onclick="openPdfViewer('${msg.url}', '${msg.id}')" 
-                        style="background: var(--brand-light); color: var(--brand-dark); border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
-                        <i class="fa-solid fa-file-pdf"></i> View PDF
-                    </button>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button onclick="window.downloadChatInvoice('${msg.id}')" 
+                            title="Download PDF"
+                            style="background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                        <button onclick="window.viewChatInvoice('${msg.id}')" 
+                            style="background: var(--brand-light); color: var(--brand-dark); border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-file-pdf"></i> View PDF
+                        </button>
+                    </div>
                 `;
             }
 
