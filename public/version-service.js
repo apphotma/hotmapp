@@ -4,7 +4,7 @@ import { elements } from './elements.js';
 
 // Current App Build Constants
 export const APP_METADATA = {
-    version: '1.0.2',       // Native Android versionName
+    version: '1.0.3',       // Native Android versionName
     versionCode: 29,        // Native Android versionCode
     webVersion: '1.1.20',   // Web build version
     platform: (window.Capacitor?.isNativePlatform?.() || window.AndroidBridge) ? 'android' : 'web'
