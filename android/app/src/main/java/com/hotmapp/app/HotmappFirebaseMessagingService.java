@@ -30,14 +30,30 @@ public class HotmappFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
+        android.os.PowerManager.WakeLock wakeLock = null;
         try {
             Log.d(TAG, "onMessageReceived: got message: " + remoteMessage.getMessageId());
+
+            // Acquire temporary WakeLock to wake CPU / screen
+            try {
+                android.os.PowerManager powerManager = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (powerManager != null) {
+                    wakeLock = powerManager.newWakeLock(
+                            android.os.PowerManager.FULL_WAKE_LOCK |
+                            android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP |
+                            android.os.PowerManager.ON_AFTER_RELEASE,
+                            "hotmapp:incoming_push_wakelock");
+                    wakeLock.acquire(10000); // 10 seconds timeout
+                }
+            } catch (Exception wakeEx) {
+                Log.w(TAG, "Failed to acquire WakeLock: " + wakeEx.getMessage());
+            }
 
             Map<String, String> data = remoteMessage.getData();
             if (data == null || data.isEmpty()) return;
 
             final String type = data.get("type");
-            if (type != null && type.equals("incoming_call")) {
+            if ("incoming_call".equals(type) || "incoming-call".equals(type)) {
                 showIncomingCallNotification(data);
                 return;
             }
@@ -98,16 +114,42 @@ public class HotmappFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
+    private boolean isAppInForeground() {
+        try {
+            android.app.ActivityManager activityManager = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (activityManager == null) return false;
+            java.util.List<android.app.ActivityManager.RunningAppProcessInfo> appProcesses = activityManager.getRunningAppProcesses();
+            if (appProcesses == null) return false;
+            final String packageName = getPackageName();
+            for (android.app.ActivityManager.RunningAppProcessInfo appProcess : appProcesses) {
+                if (appProcess.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND && appProcess.processName.equals(packageName)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "isAppInForeground error: " + e.getMessage());
+        }
+        return false;
+    }
+
     private void showIncomingCallNotification(Map<String, String> data) {
+        // If app is currently active in foreground, let the in-app WebRTC overlay handle it
+        if (isAppInForeground()) {
+            Log.d(TAG, "App is active in foreground; in-app WebRTC overlay will handle the call.");
+            return;
+        }
+
         String callerName = data.get("callerName");
+        if (callerName == null) callerName = data.get("title");
         String callId = data.get("callId");
+        if (callId == null) callId = data.get("senderId");
 
         CallNotificationHelper.createCallChannel(this);
 
-        Intent fullScreenIntent = new Intent(this, IncomingCallActivity.class);
+        Intent fullScreenIntent = new Intent(this, MainActivity.class);
         fullScreenIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId);
         fullScreenIntent.putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName);
-        fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
         PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
                 this,
@@ -115,12 +157,13 @@ public class HotmappFirebaseMessagingService extends FirebaseMessagingService {
                 fullScreenIntent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Intent acceptIntent = new Intent(this, IncomingCallReceiver.class);
+        Intent acceptIntent = new Intent(this, MainActivity.class);
         acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ACTION, IncomingCallActivity.ACTION_ACCEPT);
         acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId);
         acceptIntent.putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName);
+        acceptIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
-        PendingIntent acceptPendingIntent = PendingIntent.getBroadcast(
+        PendingIntent acceptPendingIntent = PendingIntent.getActivity(
                 this,
                 1,
                 acceptIntent,

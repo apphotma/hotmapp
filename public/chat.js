@@ -5,7 +5,7 @@ import { pushHistoryState, removeHistoryState, replaceHistoryState, dismissHisto
 import { auth, db } from './firebase-config.js';
 import { debounce, getRelativeTime, compressImage, getAvatarUrl, isEditableTextMessage } from './utils.js'; // Import utilities
 import { ref, get, child, push, query, orderByChild, orderByKey, limitToLast, endBefore, startAfter, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
-import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js';
+import { saveMessage, createGroup, promoteToAdmin, demoteFromAdmin, addGroupMembers, removeGroupMember, exitGroup, joinGroup, updateGroupProfilePhoto, updateGroupName, subscribeToMessages, subscribeToMessageUpdates, subscribeToMessageRemovals, subscribeToPinnedMessage, pinMessage, unpinMessage, markMessagesAsRead, markMessagesAsReadIds, subscribeToUnreadCount, getAllUsers, addToChatList, subscribeToChatList, getFirstUnreadMessageId, markMessageAsUnread, deleteMessagesBatch, deleteMessagesForEveryoneBatch, starMessagesBatch, getChatList, setTypingStatus, subscribeToUserProfile, subscribeToGroupProfile, uploadFile, subscribeToAllUsers, subscribeToCustomerList, subscribeToFriendRequests, sendFriendRequest, acceptFriendRequest, declineFriendRequest, toggleCustomerList, toggleMuteUser, subscribeToMutedUsers, subscribeToSentRequests, markMessagesAsDelivered, updateMessage, sendCallSignal, subscribeToCallSignals, clearCallSignal, addIceCandidate, subscribeToIceCandidates, clearIceCandidates, saveCallLog, subscribeToCallHistory, clearCallHistory, getUserProfile, unfriendUser, deleteChatFromList, updateChatArchiveStatus, updateUserProfile, subscribeToBlockedUsers, toggleBlockUser, unblockAllUsers, subscribeToNewMessages, getOrder, updateOrder } from './database-service.js';
 import { cacheItem, getCachedItem, deleteCachedItem, getCachedMessages, getOrFetchMediaBlobUrl } from './cache-manager.js';
 import { subscribeToAuthChanges } from './auth-service.js';
 import { refreshStoreGrids } from './store.js';
@@ -1247,15 +1247,35 @@ let remoteScreenSharing = new Map();
 const rtcConfig = {
     iceServers: [
         {
-            urls: "stun:stun.relay.metered.ca:80",
+            urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+                "stun:stun2.l.google.com:19302",
+                "stun:stun3.l.google.com:19302",
+                "stun:stun4.l.google.com:19302",
+                "stun:stun.cloudflare.com:3478",
+                "stun:openrelay.metered.ca:80"
+            ]
+        },
+        {
+            urls: [
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turn:openrelay.metered.ca:443?transport=tcp"
+            ],
+            username: "openrelayproject",
+            credential: "openrelayproject"
+        },
+        {
+            urls: [
+                "turns:openrelay.metered.ca:443?transport=tcp",
+                "turns:openrelay.metered.ca:5349?transport=tcp"
+            ],
+            username: "openrelayproject",
+            credential: "openrelayproject"
         },
         {
             urls: "turn:global.relay.metered.ca:80",
-            username: "2974b6941245db450ba446bb",
-            credential: "hD1fMWEf8mcSAFPr",
-        },
-        {
-            urls: "turn:global.relay.metered.ca:80?transport=tcp",
             username: "2974b6941245db450ba446bb",
             credential: "hD1fMWEf8mcSAFPr",
         },
@@ -1268,8 +1288,9 @@ const rtcConfig = {
             urls: "turns:global.relay.metered.ca:443?transport=tcp",
             username: "2974b6941245db450ba446bb",
             credential: "hD1fMWEf8mcSAFPr",
-        },
-    ]
+        }
+    ],
+    iceCandidatePoolSize: 10
 };
 
 let ringbackOsc1 = null;
@@ -3764,133 +3785,119 @@ const initLocation = () => {
 };
 
 /**
- * Voice Calling Implementation
- */
-/**
  * Voice/Video Calling Mesh WebRTC Implementation
  */
+const setNativeCallAudio = (isVideo = false, speaker = null) => {
+    try {
+        if (window.Capacitor?.Plugins?.WebRtcAudio) {
+            window.Capacitor.Plugins.WebRtcAudio.setCallAudioMode({
+                isVideo,
+                speaker: speaker !== null ? speaker : isVideo
+            }).catch(e => console.warn("Native setCallAudioMode failed:", e));
+        }
+    } catch (e) {
+        console.warn("setNativeCallAudio error:", e);
+    }
+};
+
+const resetNativeCallAudio = () => {
+    try {
+        if (window.Capacitor?.Plugins?.WebRtcAudio) {
+            window.Capacitor.Plugins.WebRtcAudio.resetAudioMode()
+                .catch(e => console.warn("Native resetAudioMode failed:", e));
+        }
+    } catch (e) {
+        console.warn("resetNativeCallAudio error:", e);
+    }
+};
+
+const setNativeSpeakerphone = (enabled) => {
+    try {
+        if (window.Capacitor?.Plugins?.WebRtcAudio) {
+            window.Capacitor.Plugins.WebRtcAudio.setSpeakerphoneOn({ enabled })
+                .catch(e => console.warn("Native setSpeakerphoneOn failed:", e));
+        }
+    } catch (e) {
+        console.warn("setNativeSpeakerphone error:", e);
+    }
+};
+
 const playRemoteStream = (targetUid, stream, type) => {
-    // Play audio in a dynamic hidden audio element
+    if (!stream) return;
+
+    // 1. Play audio reliably across all browsers and Android WebViews
+    if (elements.remoteAudio) {
+        if (elements.remoteAudio.srcObject !== stream) {
+            elements.remoteAudio.srcObject = stream;
+        }
+        elements.remoteAudio.play().catch(err => console.warn(`Audio play blocked for ${targetUid}:`, err));
+    }
+
     let audioId = `remote-audio-${targetUid}`;
     let audioEl = document.getElementById(audioId);
     if (!audioEl) {
         audioEl = document.createElement('audio');
         audioEl.id = audioId;
         audioEl.autoplay = true;
-        audioEl.style.display = 'none';
+        audioEl.playsInline = true;
+        audioEl.setAttribute('playsinline', '');
+        audioEl.setAttribute('webkit-playsinline', '');
+        audioEl.setAttribute('autoplay', '');
+        audioEl.style.position = 'fixed';
+        audioEl.style.left = '-9999px';
+        audioEl.style.top = '-9999px';
+        audioEl.style.width = '1px';
+        audioEl.style.height = '1px';
+        audioEl.style.opacity = '0';
+        audioEl.style.pointerEvents = 'none';
         document.body.appendChild(audioEl);
     }
     if (audioEl.srcObject !== stream) {
         audioEl.srcObject = stream;
-        audioEl.play().catch(err => console.warn(`Audio play blocked for ${targetUid}:`, err));
     }
+    audioEl.play().catch(() => {});
 
-    // Support legacy elements.remoteAudio for backwards compatibility if 1-to-1
-    if (peerConnections.size === 1 && elements.remoteAudio) {
-        if (elements.remoteAudio.srcObject !== stream) {
-            elements.remoteAudio.srcObject = stream;
-            elements.remoteAudio.play().catch(() => { });
-        }
-    }
+    // 2. Direct 1-to-1 Remote Video Binding
+    const hasVideoTrack = stream.getVideoTracks && stream.getVideoTracks().length > 0;
+    if ((type === 'video' || hasVideoTrack) && elements.videoContainer) {
+        showVideoCallLayout();
 
-    // Handle remote video stream
-    if (type === 'video' && elements.videoContainer) {
-        const grid = elements.remoteVideosGrid || elements.videoContainer;
-        let videoId = `remote-video-${targetUid}`;
-        let videoEl = document.getElementById(videoId);
-        if (!videoEl) {
-            videoEl = document.createElement('video');
-            videoEl.id = videoId;
-            videoEl.autoplay = true;
-            videoEl.playsInline = true;
-            videoEl.className = 'remote-grid-video';
-            grid.appendChild(videoEl);
-        }
-        if (videoEl.srcObject !== stream) {
-            videoEl.srcObject = stream;
-            videoEl.play().catch(err => console.warn(`Remote video play blocked for ${targetUid}:`, err));
+        if (elements.remoteVideo) {
+            if (elements.remoteVideo.srcObject !== stream) {
+                elements.remoteVideo.srcObject = stream;
+            }
+            elements.remoteVideo.style.display = 'block';
+            elements.remoteVideo.style.width = '100%';
+            elements.remoteVideo.style.height = '100%';
+            elements.remoteVideo.style.objectFit = 'cover';
+            elements.remoteVideo.play().catch(err => console.warn(`Remote video play blocked for ${targetUid}:`, err));
         }
 
-        // Ensure playback resumes when the remote video track starts receiving packets (e.g. after replaceTrack)
+        if (elements.videoContainer) {
+            elements.videoContainer.style.display = 'block';
+        }
+
+        // Resume playback when remote track is unmuted/active
         stream.getVideoTracks().forEach(track => {
             track.onunmute = () => {
-                videoEl.play().catch(err => console.warn(`Remote video play failed on unmute for ${targetUid}:`, err));
+                if (elements.remoteVideo) {
+                    elements.remoteVideo.play().catch(err => console.warn("Remote video play failed on unmute:", err));
+                }
             };
         });
-
-        // Hide default static remote video element
-        if (elements.remoteVideo) {
-            elements.remoteVideo.style.display = 'none';
-        }
-
-        adjustVideoContainerLayout();
     }
 };
 
 const adjustVideoContainerLayout = () => {
-    const grid = elements.remoteVideosGrid || elements.videoContainer;
-    if (!grid || !elements.videoContainer) return;
-    const remoteVideos = grid.querySelectorAll('.remote-grid-video');
-    const total = remoteVideos.length;
-
-    if (total === 0) {
+    if (elements.videoContainer && (currentCallType === 'video' || elements.callOverlay?.classList.contains('video-mode'))) {
+        elements.videoContainer.style.display = 'block';
         if (elements.remoteVideo) {
             elements.remoteVideo.style.display = 'block';
+            elements.remoteVideo.style.width = '100%';
+            elements.remoteVideo.style.height = '100%';
+            elements.remoteVideo.style.objectFit = 'cover';
         }
-        elements.videoContainer.style.display = 'none';
-        return;
     }
-
-    if (elements.remoteVideo) {
-        elements.remoteVideo.style.display = 'none';
-    }
-
-    elements.videoContainer.style.display = 'block';
-    grid.style.display = 'grid';
-
-    const isLandscape = window.innerWidth > window.innerHeight;
-
-    if (total === 1) {
-        grid.style.gridTemplateColumns = '1fr';
-        grid.style.gridTemplateRows = '1fr';
-        grid.style.gap = '0px';
-        grid.style.padding = '0px';
-    } else if (total === 2) {
-        // Equal 50/50 split
-        if (isLandscape) {
-            grid.style.gridTemplateColumns = '1fr 1fr';
-            grid.style.gridTemplateRows = '1fr';
-        } else {
-            grid.style.gridTemplateColumns = '1fr';
-            grid.style.gridTemplateRows = '1fr 1fr';
-        }
-        grid.style.gap = '8px';
-        grid.style.padding = '8px 8px calc(80px + env(safe-area-inset-bottom, 16px)) 8px';
-    } else {
-        // 3 or 4: Equal 2x2 grid
-        grid.style.gridTemplateColumns = '1fr 1fr';
-        grid.style.gridTemplateRows = '1fr 1fr';
-        grid.style.gap = '8px';
-        grid.style.padding = '8px 8px calc(80px + env(safe-area-inset-bottom, 16px)) 8px';
-    }
-
-    remoteVideos.forEach(v => {
-        v.style.width = '100%';
-        v.style.height = '100%';
-        v.style.minWidth = '0';
-        v.style.minHeight = '0';
-        v.style.display = 'block';
-
-        const targetUid = v.id.replace('remote-video-', '');
-        const stream = v.srcObject;
-        const isScreenShare = (remoteScreenSharing.get(targetUid) === true) || (stream && stream.getVideoTracks && stream.getVideoTracks().some(track => {
-            const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
-            const label = track.label ? track.label.toLowerCase() : '';
-            return settings.displaySurface || label.includes('screen') || label.includes('window') || label.includes('monitor');
-        }));
-        v.style.objectFit = isScreenShare ? 'contain' : 'cover';
-        v.style.background = isScreenShare ? '#000' : '#111b21';
-    });
 };
 
 const cleanupRemoteMedia = (targetUid) => {
@@ -3969,8 +3976,18 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
         iceSubscribes.delete(targetUid);
     }
 
+    // Clean up stale ICE candidates from previous call attempts only when initiating as caller
+    if (auth.currentUser && isCaller) {
+        clearIceCandidates(auth.currentUser.uid, targetUid).catch(() => { });
+        clearIceCandidates(targetUid, auth.currentUser.uid).catch(() => { });
+    }
+
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnections.set(targetUid, pc);
+
+    pc.onconnectionstatechange = () => {
+        console.log(`PeerConnection connectionState for ${targetUid}: ${pc.connectionState}`);
+    };
 
     const needsVideo = type === 'video';
     const hasVideo = localStream && localStream.getVideoTracks().length > 0;
@@ -3978,16 +3995,57 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
     if (!localStream || (needsVideo && !hasVideo)) {
         if (localStream) {
             console.log("Stopping old local stream to upgrade to video...");
-            localStream.getTracks().forEach(track => track.stop());
+            localStream.getTracks().forEach(track => {
+                try { track.stop(); } catch (e) { }
+            });
             localStream = null;
         }
-        const constraints = {
-            audio: true,
-            video: needsVideo ? { facingMode: currentFacingMode } : false
+
+        const audioConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
         };
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
         if (needsVideo) {
-            localStream.getVideoTracks()[0].enabled = !isCameraMuted;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: audioConstraints,
+                    video: {
+                        facingMode: { ideal: currentFacingMode || 'user' },
+                        width: { ideal: 640, max: 1280 },
+                        height: { ideal: 480, max: 720 }
+                    }
+                });
+            } catch (vErr1) {
+                console.warn("Ideal video getUserMedia failed, trying basic video:", vErr1);
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: audioConstraints,
+                        video: true
+                    });
+                } catch (vErr2) {
+                    console.warn("Video camera inaccessible on device, falling back to audio stream:", vErr2);
+                    try {
+                        localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+                    } catch (aErr) {
+                        console.error("Audio capture failed, using basic audio:", aErr);
+                        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    }
+                }
+            }
+        } else {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+            } catch (aErr) {
+                console.warn("Standard audio capture failed, using basic audio:", aErr);
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+        }
+
+        const vTracks = localStream ? localStream.getVideoTracks() : [];
+        if (vTracks.length > 0) {
+            vTracks[0].enabled = !isCameraMuted;
             if (elements.localVideo) {
                 elements.localVideo.classList.toggle('muted-blur', isCameraMuted);
                 if (isCameraMuted) {
@@ -3995,13 +4053,17 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
                     elements.localVideo.style.backgroundImage = `url(${avatar})`;
                 }
             }
+        } else if (needsVideo) {
+            showToast("Camera could not be accessed, audio active", "warning");
         }
     }
 
-    if (type === 'video' && elements.localVideo) {
+    const currentVTracks = localStream ? localStream.getVideoTracks() : [];
+    if (type === 'video' && elements.localVideo && currentVTracks.length > 0) {
         elements.localVideo.srcObject = localStream;
         elements.localVideo.classList.remove('muted-blur');
         elements.localVideo.style.backgroundImage = 'none';
+        elements.localVideo.play().catch(() => {});
     } else if (elements.localVideo) {
         elements.localVideo.srcObject = null;
         elements.localVideo.classList.add('muted-blur');
@@ -4009,7 +4071,15 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
         elements.localVideo.style.backgroundImage = `url(${avatar})`;
     }
 
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            try {
+                pc.addTrack(track, localStream);
+            } catch (trackErr) {
+                console.warn("Failed to add track to PeerConnection:", trackErr);
+            }
+        });
+    }
 
     pc.ontrack = (event) => {
         let remoteStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
@@ -4050,12 +4120,21 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
 
     pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
-        if (state === 'failed' || state === 'closed') {
+        console.log(`PeerConnection iceConnectionState for ${targetUid}: ${state}`);
+        if (state === 'connected' || state === 'completed') {
+            if (elements.callStatus) elements.callStatus.textContent = "Connected";
+        } else if (state === 'failed') {
+            console.warn(`ICE failed for ${targetUid}. Attempting ICE restart...`);
+            if (typeof pc.restartIce === 'function') {
+                try {
+                    pc.restartIce();
+                } catch (e) {
+                    console.warn("restartIce error:", e);
+                }
+            }
+        } else if (state === 'closed') {
             if (peerConnections.get(targetUid) === pc) {
                 closePeerConnection(targetUid);
-            } else {
-                console.log(`Ignoring iceconnectionstatechange for old connection of ${targetUid}`);
-                pc.close();
             }
         }
     };
@@ -4067,10 +4146,14 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
     };
 
     const unsub = subscribeToIceCandidates(auth.currentUser.uid, targetUid, (candidate) => {
-        if (pc) {
-            if (pc.remoteDescription) {
-                pc.addIceCandidate(new RTCIceCandidate(candidate))
-                    .catch(e => console.warn(`Error adding ICE candidate directly for ${targetUid}:`, e));
+        if (pc && candidate) {
+            if (pc.remoteDescription && pc.remoteDescription.type) {
+                try {
+                    pc.addIceCandidate(new RTCIceCandidate(candidate))
+                        .catch(e => console.warn(`Error adding ICE candidate directly for ${targetUid}:`, e));
+                } catch (e) {
+                    console.warn(`Error creating RTCIceCandidate for ${targetUid}:`, e);
+                }
             } else {
                 let queue = remoteCandidatesQueues.get(targetUid) || [];
                 queue.push(candidate);
@@ -4086,11 +4169,17 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
 const processCandidatesQueue = (targetUid) => {
     const pc = peerConnections.get(targetUid);
     const queue = remoteCandidatesQueues.get(targetUid);
-    if (pc && pc.remoteDescription && queue && queue.length > 0) {
+    if (pc && pc.remoteDescription && pc.remoteDescription.type && queue && queue.length > 0) {
         console.log(`Processing ${queue.length} queued ICE candidates for ${targetUid}`);
         queue.forEach(candidate => {
-            pc.addIceCandidate(new RTCIceCandidate(candidate))
-                .catch(e => console.warn(`Error adding queued ICE candidate for ${targetUid}:`, e));
+            if (candidate) {
+                try {
+                    pc.addIceCandidate(new RTCIceCandidate(candidate))
+                        .catch(e => console.warn(`Error adding queued ICE candidate for ${targetUid}:`, e));
+                } catch (e) {
+                    console.warn(`Error creating queued RTCIceCandidate for ${targetUid}:`, e);
+                }
+            }
         });
         remoteCandidatesQueues.set(targetUid, []);
     }
@@ -4252,6 +4341,7 @@ const recordCallInChat = async (partnerUid, callType, status, duration = 0, call
 };
 
 const endCall = async () => {
+    resetNativeCallAudio();
     resetLocalVideoPosition();
     elements.callMoreSheet?.classList.remove('show');
     if (elements.callMoreBackdrop) elements.callMoreBackdrop.style.display = 'none';
@@ -4276,6 +4366,9 @@ const endCall = async () => {
     peerConnections.forEach((pc, targetUid) => {
         pc.close();
         cleanupRemoteMedia(targetUid);
+        if (auth.currentUser) {
+            clearIceCandidates(auth.currentUser.uid, targetUid).catch(() => { });
+        }
     });
     peerConnections.clear();
 
@@ -4513,6 +4606,7 @@ const toggleSpeaker = async () => {
         }
 
         if (elements.callSpeakerBtn) elements.callSpeakerBtn.classList.toggle('active', isSpeakerOn);
+        setNativeSpeakerphone(isSpeakerOn);
         showToast(isSpeakerOn ? "Speaker ON" : "Handset Mode", "info");
     } catch (err) {
         console.error("Speaker toggle error:", err);
@@ -5117,6 +5211,7 @@ const retryCallHandshake = async () => {
 
 const startCallTimer = () => {
     stopCallTimer();
+    setNativeCallAudio(currentCallType === 'video', isSpeakerOn);
     callStartTime = Date.now();
     callDurationInterval = setInterval(() => {
         if (isReconnecting) {
@@ -5696,7 +5791,7 @@ const handleSingleSignal = async (senderUid, signal) => {
 
         const otherNames = groupPartners
             .filter(uid => uid !== user.uid && uid !== senderUid)
-            .map(uid => getContactDisplayName(uid, allUsersCache[uid]) || 'Contact')
+            .map(uid => allUsersCache[uid]?.fullname || 'Contact')
             .join(', ');
 
         const senderName = getContactDisplayName(senderUid, allUsersCache[senderUid]) || signal.fromName || 'Contact';
@@ -5855,8 +5950,10 @@ const handleSingleSignal = async (senderUid, signal) => {
             stopRingAudio();
             if (elements.callOverlayPulse) elements.callOverlayPulse.style.display = 'none';
             try {
-                if (pc.signalingState === 'have-local-offer') {
+                if (pc.signalingState === 'have-local-offer' && !pc._isSettingRemoteAnswer) {
+                    pc._isSettingRemoteAnswer = true;
                     await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.answer }));
+                    pc._isSettingRemoteAnswer = false;
                     processCandidatesQueue(senderUid);
                 }
                 elements.callStatus.textContent = "Connected";
@@ -5867,12 +5964,15 @@ const handleSingleSignal = async (senderUid, signal) => {
                     elements.callVideoBtn.style.display = 'flex';
                 }
             } catch (err) {
-                console.error(`Error setting remote answer description for ${senderUid}:`, err);
+                if (pc) pc._isSettingRemoteAnswer = false;
+                if (err.name !== 'InvalidStateError' || (pc && pc.signalingState !== 'stable')) {
+                    console.error(`Error setting remote answer description for ${senderUid}:`, err);
+                }
             }
         }
     } else if (signal.status === 'accepted') {
-        // If we are currently ringing for this call on another device, stop ringing and hide overlay
-        if (currentCallPartnerUid === senderUid) {
+        // If we are currently ringing for this call on another idle device, stop ringing and hide overlay
+        if (currentCallPartnerUid === senderUid && !peerConnections.has(senderUid) && (!elements.callOverlay || elements.callOverlay.style.display !== 'flex')) {
             console.log(`Call accepted on another device. Stopping ringtone.`);
             stopRingAudio();
             if (elements.incomingCallOverlay) elements.incomingCallOverlay.style.display = 'none';

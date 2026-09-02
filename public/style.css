@@ -474,6 +474,8 @@ iframe {
     flex: 1;
     min-width: 0;
     min-height: 0;
+    padding-bottom: 24px;
+    box-sizing: border-box;
 }
 
 .conversation-item {
@@ -3883,6 +3885,12 @@ iframe {
         /* Firefox */
     }
 
+    .conversations-list,
+    .starred-messages-list {
+        padding-bottom: calc(85px + env(safe-area-inset-bottom, 24px)) !important;
+        box-sizing: border-box;
+    }
+
     .conversations-list::-webkit-scrollbar,
     .messages-container::-webkit-scrollbar {
         display: none;
@@ -4001,6 +4009,10 @@ iframe {
 
     .chatsidebar,
     .costomersidebar,
+    .starredsidebar,
+    .callssidebar,
+    .archivedsidebar,
+    .lockedchatssidebar,
     .chat-area {
         display: flex;
         /* This is the fix */

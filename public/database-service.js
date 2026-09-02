@@ -1523,15 +1523,29 @@ export const clearCallSignal = async (uid, senderUid) => {
 };
 
 export const addIceCandidate = async (targetUid, senderUid, candidate) => {
+    if (!targetUid) return;
     let actualSenderUid = senderUid;
     let actualCandidate = candidate;
-    if (senderUid && typeof senderUid.toJSON === 'function' && !candidate) {
+    if (senderUid && (typeof senderUid.toJSON === 'function' || senderUid.candidate !== undefined) && !candidate) {
         actualCandidate = senderUid;
         actualSenderUid = auth.currentUser ? auth.currentUser.uid : 'unknown';
     }
-    const candidatesRef = ref(db, `calls/${targetUid}/candidates/${actualSenderUid}`);
-    const newCandidateRef = push(candidatesRef);
-    await set(newCandidateRef, actualCandidate.toJSON());
+    if (!actualCandidate) return;
+    try {
+        let rawData = typeof actualCandidate.toJSON === 'function' ? actualCandidate.toJSON() : actualCandidate;
+        if (typeof rawData !== 'object' || rawData === null) return;
+        const cleanData = {};
+        if (rawData.candidate !== undefined) cleanData.candidate = rawData.candidate;
+        if (rawData.sdpMid !== undefined && rawData.sdpMid !== null) cleanData.sdpMid = rawData.sdpMid;
+        if (rawData.sdpMLineIndex !== undefined && rawData.sdpMLineIndex !== null) cleanData.sdpMLineIndex = rawData.sdpMLineIndex;
+        if (rawData.usernameFragment !== undefined && rawData.usernameFragment !== null) cleanData.usernameFragment = rawData.usernameFragment;
+
+        const candidatesRef = ref(db, `calls/${targetUid}/candidates/${actualSenderUid}`);
+        const newCandidateRef = push(candidatesRef);
+        await set(newCandidateRef, cleanData);
+    } catch (err) {
+        console.warn("Failed to push ICE candidate:", err);
+    }
 };
 
 export const clearIceCandidates = async (targetUid, senderUid) => {

@@ -398,26 +398,28 @@ exports.sendCallNotification = onValueCreated("/calls/{targetUid}/{senderUid}", 
 
     const payload = {
         tokens: tokens,
-        notification: {
+        data: {
+            type: "incoming_call",
+            callId: senderUid,
+            callerName: senderName,
+            senderId: senderUid,
+            callType: callType,
             title: `Incoming ${callType.charAt(0).toUpperCase() + callType.slice(1)} Call`,
             body: `Incoming call from ${senderName}`
         },
-        data: {
-            type: "incoming-call",
-            senderId: senderUid,
-            callType: callType
-        },
         android: {
             priority: "high",
+            ttl: 30000,
             notification: {
                 sound: "ringtone",
-                channelId: "calls"
+                channelId: "hotmapp_call_channel"
             }
         },
         apns: {
             payload: {
                 aps: {
-                    sound: "ringtone.caf"
+                    sound: "ringtone.caf",
+                    contentAvailable: true
                 }
             }
         }

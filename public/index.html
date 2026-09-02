@@ -416,7 +416,8 @@
                 </div>
                 <button type="button" class="auth-submit-btn" data-ui="refresh-location-cache-btn"
                     data-i18n="refreshLocation" style="background: var(--muted); margin-top: 15px;">
-                    <i class="fa-solid fa-arrows-rotate" style="margin-right: 6px;"></i> Refresh Location Data Cache</button>
+                    <i class="fa-solid fa-arrows-rotate" style="margin-right: 6px;"></i> Refresh Location Data
+                    Cache</button>
                 <button type="submit" class="auth-submit-btn save-profile-btn" data-i18n="saveChanges">Save
                     Changes</button>
                 <button type="button" class="auth-submit-btn" data-ui="profile-logout-btn" data-i18n="logout"
@@ -1897,58 +1898,87 @@
                         <label>Business Category <span class="required-indicator" title="Required">*</span></label>
                         <input type="hidden" name="businessCategory" required data-ui="business-category" value="">
                         <div class="business-category-checkboxes" data-ui="business-category-checkboxes">
-                            <div class="category-selection-count" style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected: <span class="selected-count-val">0</span> / 3</div>
-                            <div class="category-checkbox-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Agriculture and Farming"> 🌾 Agriculture and Farming
+                            <div class="category-selection-count"
+                                style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected: <span
+                                    class="selected-count-val">0</span> / 3</div>
+                            <div class="category-checkbox-container"
+                                style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox"
+                                        value="Agriculture and Farming"> 🌾 Agriculture and Farming
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Animals and Pets"> 🐾 Animals and Pets
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Animals and Pets"> 🐾
+                                    Animals and Pets
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Beauty and Personal Care"> 💅 Beauty and Personal Care
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox"
+                                        value="Beauty and Personal Care"> 💅 Beauty and Personal Care
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and Tools
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox"
+                                        value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and Tools
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Electronics"> 💻 Electronics
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Electronics"> 💻
+                                    Electronics
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Fashion"> 👗 Fashion
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Grocery"> 🛒 Grocery
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox"
+                                        value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Pharmacy"> 💊 Pharmacy
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Phone"> 📱 Phone
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Property"> 🏠 Property
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Repair and Construction"> 🔨 Repair and Construction
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox"
+                                        value="Repair and Construction"> 🔨 Repair and Construction
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                    <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant"> 🍔 Restaurant
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                    <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant"> 🍔
+                                    Restaurant
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Service"> 💼 Service
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Vehicles"> 🚗 Vehicles
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
                                     <input type="checkbox" name="businessCategoryCheckbox" value="Other"> ✨ Other
                                 </label>
                             </div>
-                            <input type="text" placeholder="Specify custom category..." class="store-search-input" data-ui="custom-category-input" style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
+                            <input type="text" placeholder="Specify custom category..." class="store-search-input"
+                                data-ui="custom-category-input"
+                                style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
                         </div>
                         <div class="error-msg" data-ui="business-category-error"></div>
                     </div>
@@ -1956,9 +1986,11 @@
                         <label>Store Currency</label>
                         <div class="field-hint"
                             style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
-                            Select the primary currency for product prices, delivery charges, and customer checkout.</div>
+                            Select the primary currency for product prices, delivery charges, and customer checkout.
+                        </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            <select name="storeCurrency" data-ui="store-currency" style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
+                            <select name="storeCurrency" data-ui="store-currency"
+                                style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
                                 <option value="$">$ (USD / Dollar)</option>
                                 <option value="€">€ (EUR / Euro)</option>
                                 <option value="£">£ (GBP / British Pound)</option>
@@ -1973,7 +2005,10 @@
                                 <option value="GHS">GHS (Ghanaian Cedi)</option>
                                 <option value="custom">Other / Custom Symbol...</option>
                             </select>
-                            <input type="text" data-ui="custom-store-currency" name="customStoreCurrency" placeholder="e.g. CHF" style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;" maxlength="6">
+                            <input type="text" data-ui="custom-store-currency" name="customStoreCurrency"
+                                placeholder="e.g. CHF"
+                                style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;"
+                                maxlength="6">
                         </div>
                     </div>
                     <div class="form-group">
@@ -2020,48 +2055,70 @@
                     <div data-ui="delivery-coverage-section" style="display: none;">
                         <h5>Delivery Coverage</h5>
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="delivery-fee">Standard Delivery Fee (<span class="delivery-currency-sym">$</span>)</label>
+                            <label for="delivery-fee">Standard Delivery Fee (<span
+                                    class="delivery-currency-sym">$</span>)</label>
                             <input type="number" name="deliveryFee" step="0.01" min="0" data-ui="delivery-fee"
                                 placeholder="0.00">
                             <div class="error-msg" data-ui="delivery-fee-error"></div>
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="min-free-delivery">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
+                            <label for="min-free-delivery">Min Order for Free Delivery (<span
+                                    class="delivery-currency-sym">$</span>)</label>
                             <input type="number" name="minFreeDelivery" step="0.01" min="0" data-ui="min-free-delivery"
                                 placeholder="Leave empty for no limit">
                             <div class="error-msg" data-ui="min-free-delivery-error"></div>
                         </div>
 
                         <!-- Distance-Based Delivery Tiers UI -->
-                        <div class="form-group" style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
+                        <div class="form-group"
+                            style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                <input type="checkbox" id="reg-use-delivery-tiers" data-ui="use-delivery-tiers" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
-                                <label for="reg-use-delivery-tiers" style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based Delivery Fees</label>
+                                <input type="checkbox" id="reg-use-delivery-tiers" data-ui="use-delivery-tiers"
+                                    style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                                <label for="reg-use-delivery-tiers"
+                                    style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based Delivery
+                                    Fees</label>
                             </div>
-                            
+
                             <!-- Tiers config list (visible when checked) -->
                             <div data-ui="delivery-tiers-config" style="display: none;">
-                                <div style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
+                                <div
+                                    style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
                                     <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">
-                                        <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How Distance-Based Pricing Works:
+                                        <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How
+                                        Distance-Based Pricing Works:
                                     </div>
                                     <ul style="margin: 0; padding-left: 18px; font-size: 0.76rem; color: #4b5563;">
-                                        <li><strong>Max Distance (km):</strong> Straight-line radius in <strong>kilometers (km)</strong> from your store (e.g. <code>5</code> means up to 5 km).</li>
-                                        <li><strong>Delivery Fee (<span class="delivery-currency-sym">$</span>):</strong> The shipping charge for orders delivered within this kilometer range.</li>
-                                        <li><strong>Free Order Min (<span class="delivery-currency-sym">$</span>):</strong> <em>(Optional)</em> If customer purchase amount reaches this amount or higher, delivery is <strong>FREE</strong> for this distance.</li>
+                                        <li><strong>Max Distance (km):</strong> Straight-line radius in
+                                            <strong>kilometers (km)</strong> from your store (e.g. <code>5</code> means
+                                            up to 5 km).</li>
+                                        <li><strong>Delivery Fee (<span
+                                                    class="delivery-currency-sym">$</span>):</strong> The shipping
+                                            charge for orders delivered within this kilometer range.</li>
+                                        <li><strong>Free Order Min (<span
+                                                    class="delivery-currency-sym">$</span>):</strong>
+                                            <em>(Optional)</em> If customer purchase amount reaches this amount or
+                                            higher, delivery is <strong>FREE</strong> for this distance.</li>
                                     </ul>
                                 </div>
 
                                 <!-- Column Headers for Tiers -->
-                                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
+                                <div
+                                    style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
                                     <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                        Distance <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up to km)</span>
+                                        Distance <span
+                                            style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up to
+                                            km)</span>
                                     </div>
                                     <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                        Delivery Fee <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span class="delivery-currency-sym">$</span>)</span>
+                                        Delivery Fee <span
+                                            style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span
+                                                class="delivery-currency-sym">$</span>)</span>
                                     </div>
                                     <div style="flex: 1.5; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                        Free Order Min <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional <span class="delivery-currency-sym">$</span>)</span>
+                                        Free Order Min <span
+                                            style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional
+                                            <span class="delivery-currency-sym">$</span>)</span>
                                     </div>
                                     <div style="width: 28px;"></div>
                                 </div>
@@ -2070,23 +2127,33 @@
                                     <!-- Dynamic rows added here -->
                                 </div>
                                 <button type="button" class="auth-submit-btn" data-ui="add-delivery-tier-btn"
-                                    style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+ Add Distance Tier</button>
-                                
+                                    style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+
+                                    Add Distance Tier</button>
+
                                 <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
-                                
+
                                 <!-- Fallback Setting (Deliver all over) -->
                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                    <input type="checkbox" id="reg-allow-fallback" data-ui="allow-fallback" style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
-                                    <label for="reg-allow-fallback" style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over (allow delivery beyond maximum tier distance)</label>
+                                    <input type="checkbox" id="reg-allow-fallback" data-ui="allow-fallback"
+                                        style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
+                                    <label for="reg-allow-fallback"
+                                        style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over (allow
+                                        delivery beyond maximum tier distance)</label>
                                 </div>
                                 <div data-ui="fallback-inputs" style="display: none; padding-left: 24px; gap: 15px;">
                                     <div style="flex: 1; margin-bottom: 10px;">
-                                        <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers (<span class="delivery-currency-sym">$</span>)</label>
-                                        <input type="number" step="0.01" min="0" data-ui="fallback-fee" placeholder="0.00" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                        <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers (<span
+                                                class="delivery-currency-sym">$</span>)</label>
+                                        <input type="number" step="0.01" min="0" data-ui="fallback-fee"
+                                            placeholder="0.00"
+                                            style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
                                     </div>
                                     <div style="flex: 1; margin-bottom: 10px;">
-                                        <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
-                                        <input type="number" step="0.01" min="0" data-ui="fallback-min-free" placeholder="Leave empty for no limit" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                        <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free Delivery
+                                            (<span class="delivery-currency-sym">$</span>)</label>
+                                        <input type="number" step="0.01" min="0" data-ui="fallback-min-free"
+                                            placeholder="Leave empty for no limit"
+                                            style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
                                     </div>
                                 </div>
                             </div>
@@ -2101,6 +2168,8 @@
                                     style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.85rem; font-weight: 600;">States</button>
                                 <button type="button" class="type-btn" data-value="cities"
                                     style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.85rem; font-weight: 600;">Cities</button>
+                                <button type="button" class="type-btn" data-value="streets"
+                                    style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.85rem; font-weight: 600;">Streets</button>
                             </div>
                             <input type="hidden" name="deliveryCoverageType" data-ui="delivery-coverage-type" value="">
                             <div class="error-msg" data-ui="delivery-coverage-error"></div>
@@ -2111,33 +2180,19 @@
                                     title="Required">*</span></label>
                             <div class="input-hint"
                                 style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                Add the countries where your delivery service is available.</div>
-                            <div class="custom-select-wrapper" data-ui="countries-picker-wrapper">
-                                <button type="button" class="auth-submit-btn" data-ui="countries-trigger"
-                                    data-placeholder="Choose Countries"
-                                    style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                    Countries/Provinces</button>
-                                <div class="selected-chips" data-ui="countries-selected-chips"
-                                    style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                Search and add the countries where your delivery service is available.</div>
+                            <div style="position: relative;">
+                                <input type="text" class="search-input" data-ui="delivery-countries-input"
+                                    placeholder="Type country name (e.g. Nigeria, United States, Canada)..."
+                                    style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                <div data-ui="seller-countries-suggestions"
+                                    style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                 </div>
-                                <div class="custom-select-dropdown" data-ui="countries-dropdown">
-                                    <div class="search-box">
-                                        <input type="text" placeholder="Search countries..." class="search-input"
-                                            data-ui="countries-search-input">
-                                    </div>
-                                    <div class="select-all-container"
-                                        style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" data-ui="countries-select-all-checkbox"
-                                            id="countries-select-all"
-                                            style="width: 18px; height: 18px; cursor: pointer;">
-                                        <label for="countries-select-all"
-                                            style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                            All</label>
-                                    </div>
-                                    <div class="options-list" data-ui="countries-options-list"></div>
-                                </div>
-                                <input type="hidden" name="deliveryCountries" data-ui="delivery-countries" value="[]">
                             </div>
+                            <div data-ui="seller-countries-chips"
+                                style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            </div>
+                            <input type="hidden" name="deliveryCountries" data-ui="delivery-countries" value="[]">
                         </div>
 
                         <div class="form-group" data-ui="delivery-states-section" style="display: none;">
@@ -2145,66 +2200,85 @@
                                     title="Required">*</span></label>
                             <div class="input-hint"
                                 style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                Add the states or regions where your delivery service is available within the selected
-                                countries. Add all states/regions if delivery covers the entire country.</div>
-                            <div class="custom-select-wrapper" data-ui="states-picker-wrapper">
-                                <button type="button" class="auth-submit-btn" data-ui="states-trigger"
-                                    data-placeholder="Choose States"
-                                    style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                    States/Provinces</button>
-                                <div class="selected-chips" data-ui="states-selected-chips"
-                                    style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                Search and add the states/provinces where your delivery service is available.</div>
+                            <div style="position: relative;">
+                                <input type="text" class="search-input" data-ui="delivery-states-input"
+                                    placeholder="Type state or province (e.g. Lagos, California, Ontario, Texas)..."
+                                    style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                <div data-ui="seller-states-suggestions"
+                                    style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                 </div>
-                                <div class="custom-select-dropdown" data-ui="states-dropdown">
-                                    <div class="search-box">
-                                        <input type="text" placeholder="Search states..." class="search-input"
-                                            data-ui="states-search-input">
-                                    </div>
-                                    <div class="select-all-container"
-                                        style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" data-ui="states-select-all-checkbox"
-                                            id="states-select-all" style="width: 18px; height: 18px; cursor: pointer;">
-                                        <label for="states-select-all"
-                                            style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                            All</label>
-                                    </div>
-                                    <div class="options-list" data-ui="states-options-list"></div>
-                                </div>
-                                <input type="hidden" name="deliveryStates" data-ui="delivery-states" value="[]">
                             </div>
+                            <div data-ui="seller-states-chips"
+                                style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            </div>
+                            <input type="hidden" name="deliveryStates" data-ui="delivery-states" value="[]">
                         </div>
 
                         <div class="form-group" data-ui="delivery-cities-section" style="display: none;">
                             <label for="delivery-cities">Select Cities</label>
                             <div class="input-hint"
                                 style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                Add the specific cities where your delivery service is available within the selected
-                                states. Add all cities if delivery covers the entire state.</div>
-                            <div class="custom-select-wrapper" data-ui="cities-picker-wrapper">
-                                <button type="button" class="auth-submit-btn" data-ui="cities-trigger"
-                                    data-placeholder="Choose Cities"
-                                    style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                    Cities</button>
-                                <div class="selected-chips" data-ui="cities-selected-chips"
-                                    style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                Search and add the specific cities where your delivery service is available.</div>
+                            <div style="position: relative;">
+                                <input type="text" class="search-input" data-ui="delivery-cities-input"
+                                    placeholder="Type city name (e.g. Ikeja, Lagos, Los Angeles, London, Toronto)..."
+                                    style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                <div data-ui="seller-cities-suggestions"
+                                    style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                 </div>
-                                <div class="custom-select-dropdown" data-ui="cities-dropdown">
-                                    <div class="search-box">
-                                        <input type="text" placeholder="Search cities..." class="search-input"
-                                            data-ui="cities-search-input">
-                                    </div>
-                                    <div class="select-all-container"
-                                        style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" data-ui="cities-select-all-checkbox"
-                                            id="cities-select-all" style="width: 18px; height: 18px; cursor: pointer;">
-                                        <label for="cities-select-all"
-                                            style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                            All</label>
-                                    </div>
-                                    <div class="options-list" data-ui="cities-options-list"></div>
-                                </div>
-                                <input type="hidden" name="deliveryCities" data-ui="delivery-cities" value="[]">
                             </div>
+                            <div data-ui="seller-cities-chips"
+                                style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            </div>
+                            <input type="hidden" name="deliveryCities" data-ui="delivery-cities" value="[]">
+                        </div>
+
+                        <div class="form-group" data-ui="delivery-streets-section" style="display: none;">
+                            <label for="delivery-streets">Allowed Streets / Neighborhoods</label>
+                            <div class="input-hint"
+                                style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
+                                Search and select the specific streets, districts, or neighborhoods where you deliver
+                                (with 1 km spread buffer).</div>
+                            <div style="position: relative;">
+                                <input type="text" class="search-input" data-ui="delivery-streets-input"
+                                    placeholder="Type a street or neighborhood (e.g. Maryland, Broadway, Ikeja GRA)..."
+                                    style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                <div data-ui="seller-streets-suggestions"
+                                    style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
+                                </div>
+                            </div>
+
+                            <!-- Selected Street Chips -->
+                            <div data-ui="seller-streets-chips"
+                                style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            </div>
+
+                            <!-- Fallback Landmark Prompt for Seller -->
+                            <div data-ui="seller-landmark-prompt"
+                                style="display: none; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.4); font-size: 0.82rem; color: var(--text);">
+                                <div
+                                    style="font-weight: 600; color: #d97706; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Location not pinpointed on map
+                                </div>
+                                <div style="color: var(--muted); margin-bottom: 8px; line-height: 1.35;">
+                                    Map cannot locate "<span data-ui="unresolved-seller-street"
+                                        style="font-weight: 600; color: var(--text);"></span>". Please enter a nearest
+                                    popular landmark (e.g. school, bank, junction, bus stop) to anchor this area:
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    <input type="text" data-ui="seller-landmark-input"
+                                        placeholder="Nearest landmark (e.g. City Bank, Central Junction)..."
+                                        style="flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem; outline: none; background: white; color: var(--text);">
+                                    <button type="button" data-ui="apply-seller-landmark-btn"
+                                        style="background: var(--brand); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">Add
+                                        Area</button>
+                                </div>
+                            </div>
+
+                            <input type="hidden" name="deliveryStreets" data-ui="delivery-streets" value="[]">
+                            <input type="hidden" name="deliveryStreetPoints" data-ui="delivery-street-points"
+                                value="[]">
                         </div>
                     </div>
                     <div class="wizard-navigation">
@@ -2286,25 +2360,33 @@
         style="display: none; z-index: 99999; backdrop-filter: blur(8px); background: rgba(0, 0, 0, 0.85);">
         <div class="modal-content auth-card force-update-card"
             style="max-width: 420px; text-align: center; padding: 32px 24px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid var(--border); background: var(--panel);">
-            <div style="width: 76px; height: 76px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; border: 2px solid rgba(0, 168, 132, 0.3);">
+            <div
+                style="width: 76px; height: 76px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; border: 2px solid rgba(0, 168, 132, 0.3);">
                 <i class="fa-solid fa-cloud-arrow-down" style="font-size: 2.2rem; color: var(--brand);"></i>
             </div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text); margin-bottom: 8px;" data-ui="update-modal-title">Update Required</h2>
-            <p style="font-size: 0.92rem; color: var(--muted); line-height: 1.5; margin-bottom: 20px;" data-ui="update-modal-message">
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text); margin-bottom: 8px;"
+                data-ui="update-modal-title">Update Required</h2>
+            <p style="font-size: 0.92rem; color: var(--muted); line-height: 1.5; margin-bottom: 20px;"
+                data-ui="update-modal-message">
                 A new version of HOTMAPP is available. Please update to continue using all features.
             </p>
 
-            <div style="background: var(--panel-soft); border-radius: 12px; padding: 12px 16px; margin-bottom: 22px; font-size: 0.84rem; text-align: left; border: 1px solid var(--border);" data-ui="update-notes-container">
+            <div style="background: var(--panel-soft); border-radius: 12px; padding: 12px 16px; margin-bottom: 22px; font-size: 0.84rem; text-align: left; border: 1px solid var(--border);"
+                data-ui="update-notes-container">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600;">
-                    <span style="color: var(--muted);">Your Version: <strong data-ui="update-current-ver" style="color: var(--text);">v1.0.1</strong></span>
-                    <span style="color: var(--brand);">Latest: <strong data-ui="update-latest-ver">v1.0.1</strong></span>
+                    <span style="color: var(--muted);">Your Version: <strong data-ui="update-current-ver"
+                            style="color: var(--text);">v1.0.1</strong></span>
+                    <span style="color: var(--brand);">Latest: <strong
+                            data-ui="update-latest-ver">v1.0.1</strong></span>
                 </div>
-                <div style="color: var(--muted); font-size: 0.8rem; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 6px;" data-ui="update-release-notes">
+                <div style="color: var(--muted); font-size: 0.8rem; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 6px;"
+                    data-ui="update-release-notes">
                     Includes new improvements, performance optimizations, and bug fixes.
                 </div>
             </div>
 
-            <a href="https://play.google.com/store/apps/details?id=com.hotmapp.app" target="_blank" class="auth-submit-btn" data-ui="update-now-btn"
+            <a href="https://play.google.com/store/apps/details?id=com.hotmapp.app" target="_blank"
+                class="auth-submit-btn" data-ui="update-now-btn"
                 style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 1.05rem; padding: 14px; border-radius: 12px; background: var(--brand); color: white; box-shadow: 0 4px 14px rgba(0, 168, 132, 0.35); cursor: pointer;">
                 <i class="fa-solid fa-download"></i> Update Now
             </a>
@@ -2833,6 +2915,37 @@
                                         </div>
                                     </div>
 
+                                    <!-- Autocomplete Suggestions Dropdown -->
+                                    <div data-ui="delivery-address-suggestions"
+                                        style="display: none; position: relative; width: 100%; max-height: 180px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.1); z-index: 100; margin-top: 4px;">
+                                    </div>
+
+                                    <!-- Unresolved Street Landmark Prompt -->
+                                    <div data-ui="delivery-landmark-prompt"
+                                        style="display: none; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.4); font-size: 0.82rem; color: var(--text);">
+                                        <div
+                                            style="font-weight: 600; color: #d97706; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                            <i class="fa-solid fa-triangle-exclamation"></i> Location not pinpointed on
+                                            map
+                                        </div>
+                                        <div style="color: var(--muted); margin-bottom: 8px; line-height: 1.35;">
+                                            Map cannot locate "<span data-ui="unresolved-query-text"
+                                                style="font-weight: 600; color: var(--text);"></span>". Please enter a
+                                            nearest popular landmark (e.g. school, bank, hospital, junction, bus stop)
+                                            so delivery can detect your area:
+                                        </div>
+                                        <div style="display: flex; gap: 6px;">
+                                            <input type="text" data-ui="delivery-landmark-input"
+                                                placeholder="Nearest landmark (e.g. City Bank, Central Junction)..."
+                                                style="flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem; outline: none; background: white; color: var(--text);">
+                                            <button type="button" data-ui="apply-landmark-btn"
+                                                style="background: var(--brand); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">Detect</button>
+                                        </div>
+                                        <div data-ui="landmark-suggestions-list"
+                                            style="display: none; margin-top: 6px; max-height: 120px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 6px;">
+                                        </div>
+                                    </div>
+
                                     <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
                                         <input type="checkbox" id="save-address" data-ui="save-address-checkbox"
                                             style="width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer;">
@@ -3049,60 +3162,99 @@
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
                                     Select up to 3 categories that best represent the products you sell.</div>
-                                <input type="hidden" name="businessCategory" required data-ui="business-category" value="">
+                                <input type="hidden" name="businessCategory" required data-ui="business-category"
+                                    value="">
                                 <div class="business-category-checkboxes" data-ui="business-category-checkboxes">
-                                    <div class="category-selection-count" style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected: <span class="selected-count-val">0</span> / 3</div>
-                                    <div class="category-checkbox-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Agriculture and Farming"> 🌾 Agriculture and Farming
+                                    <div class="category-selection-count"
+                                        style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Selected:
+                                        <span class="selected-count-val">0</span> / 3</div>
+                                    <div class="category-checkbox-container"
+                                        style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-soft); display: flex; flex-direction: column; gap: 8px;">
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Agriculture and Farming"> 🌾 Agriculture and Farming
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Animals and Pets"> 🐾 Animals and Pets
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Animals and Pets"> 🐾 Animals and Pets
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Beauty and Personal Care"> 💅 Beauty and Personal Care
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Beauty and Personal Care"> 💅 Beauty and Personal Care
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and Tools
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Commercial Equipment and Tools"> 🛠️ Commercial Equipment and
+                                            Tools
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Electronics"> 💻 Electronics
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Electronics">
+                                            💻 Electronics
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Fashion"> 👗 Fashion
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Fashion"> 👗
+                                            Fashion
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Grocery"> 🛒 Grocery
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Grocery"> 🛒
+                                            Grocery
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Home Furniture and Appliances"> 🛋️ Home Furniture and Appliances
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Pharmacy"> 💊 Pharmacy
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Pharmacy"> 💊
+                                            Pharmacy
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Phone"> 📱 Phone
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Phone"> 📱
+                                            Phone
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Property"> 🏠 Property
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Property"> 🏠
+                                            Property
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Repair and Construction"> 🔨 Repair and Construction
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox"
+                                                value="Repair and Construction"> 🔨 Repair and Construction
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant"> 🍔 Restaurant
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Restaurant">
+                                            🍔 Restaurant
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Service"> 💼 Service
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Service"> 💼
+                                            Service
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Vehicles"> 🚗 Vehicles
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Vehicles"> 🚗
+                                            Vehicles
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
-                                            <input type="checkbox" name="businessCategoryCheckbox" value="Other"> ✨ Other
+                                        <label
+                                            style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0; color: var(--text);">
+                                            <input type="checkbox" name="businessCategoryCheckbox" value="Other"> ✨
+                                            Other
                                         </label>
                                     </div>
-                                    <input type="text" placeholder="Specify custom category..." class="store-search-input" data-ui="custom-category-input" style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
+                                    <input type="text" placeholder="Specify custom category..."
+                                        class="store-search-input" data-ui="custom-category-input"
+                                        style="display: none; margin-top: 8px; height: 38px; border-radius: 8px; width: 100%; box-sizing: border-box; background: white; border: 1px solid var(--border); padding: 0 12px; color: var(--text); outline: none;">
                                 </div>
                                 <div class="error-msg" data-ui="business-category-error"></div>
                             </div>
@@ -3110,9 +3262,11 @@
                                 <label>Store Currency</label>
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
-                                    Select the primary currency for product prices, delivery charges, and customer checkout.</div>
+                                    Select the primary currency for product prices, delivery charges, and customer
+                                    checkout.</div>
                                 <div style="display: flex; gap: 8px; align-items: center;">
-                                    <select name="storeCurrency" data-ui="store-currency" style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
+                                    <select name="storeCurrency" data-ui="store-currency"
+                                        style="flex: 1; height: 42px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem;">
                                         <option value="$">$ (USD / Dollar)</option>
                                         <option value="€">€ (EUR / Euro)</option>
                                         <option value="£">£ (GBP / British Pound)</option>
@@ -3127,7 +3281,10 @@
                                         <option value="GHS">GHS (Ghanaian Cedi)</option>
                                         <option value="custom">Other / Custom Symbol...</option>
                                     </select>
-                                    <input type="text" data-ui="custom-store-currency" name="customStoreCurrency" placeholder="e.g. CHF" style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;" maxlength="6">
+                                    <input type="text" data-ui="custom-store-currency" name="customStoreCurrency"
+                                        placeholder="e.g. CHF"
+                                        style="width: 100px; height: 42px; display: none; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text); font-size: 0.9rem; box-sizing: border-box;"
+                                        maxlength="6">
                                 </div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
@@ -3182,7 +3339,8 @@
                                 <div class="error-msg" data-ui="delivery-fee-error"></div>
                             </div>
                             <div class="form-group" style="margin-bottom: 20px;">
-                                <label>Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
+                                <label>Min Order for Free Delivery (<span
+                                        class="delivery-currency-sym">$</span>)</label>
                                 <div class="field-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -4px; margin-bottom: 8px;">
                                     Minimum order total to get free delivery. Leave blank for no free delivery.</div>
@@ -3192,35 +3350,56 @@
                             </div>
 
                             <!-- Distance-Based Delivery Tiers UI -->
-                            <div class="form-group" style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
+                            <div class="form-group"
+                                style="margin-bottom: 20px; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #fdfdfd;">
                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                    <input type="checkbox" id="edit-use-delivery-tiers" data-ui="use-delivery-tiers" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
-                                    <label for="edit-use-delivery-tiers" style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based Delivery Fees</label>
+                                    <input type="checkbox" id="edit-use-delivery-tiers" data-ui="use-delivery-tiers"
+                                        style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                                    <label for="edit-use-delivery-tiers"
+                                        style="font-weight: 600; cursor: pointer; margin: 0;">Enable Distance-Based
+                                        Delivery Fees</label>
                                 </div>
-                                
+
                                 <!-- Tiers config list (visible when checked) -->
                                 <div data-ui="delivery-tiers-config" style="display: none;">
-                                    <div style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
+                                    <div
+                                        style="font-size: 0.8rem; color: #374151; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; line-height: 1.45;">
                                         <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">
-                                            <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How Distance-Based Pricing Works:
+                                            <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> How
+                                            Distance-Based Pricing Works:
                                         </div>
                                         <ul style="margin: 0; padding-left: 18px; font-size: 0.76rem; color: #4b5563;">
-                                            <li><strong>Max Distance (km):</strong> Straight-line radius in <strong>kilometers (km)</strong> from your store (e.g. <code>5</code> means up to 5 km).</li>
-                                            <li><strong>Delivery Fee (<span class="delivery-currency-sym">$</span>):</strong> The shipping charge for orders delivered within this kilometer range.</li>
-                                            <li><strong>Free Order Min (<span class="delivery-currency-sym">$</span>):</strong> <em>(Optional)</em> If customer purchase amount reaches this amount or higher, delivery is <strong>FREE</strong> for this distance.</li>
+                                            <li><strong>Max Distance (km):</strong> Straight-line radius in
+                                                <strong>kilometers (km)</strong> from your store (e.g. <code>5</code>
+                                                means up to 5 km).</li>
+                                            <li><strong>Delivery Fee (<span
+                                                        class="delivery-currency-sym">$</span>):</strong> The shipping
+                                                charge for orders delivered within this kilometer range.</li>
+                                            <li><strong>Free Order Min (<span
+                                                        class="delivery-currency-sym">$</span>):</strong>
+                                                <em>(Optional)</em> If customer purchase amount reaches this amount or
+                                                higher, delivery is <strong>FREE</strong> for this distance.</li>
                                         </ul>
                                     </div>
 
                                     <!-- Column Headers for Tiers -->
-                                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
+                                    <div
+                                        style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; padding: 0 2px;">
                                         <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                            Distance <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up to km)</span>
+                                            Distance <span
+                                                style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Up
+                                                to km)</span>
                                         </div>
                                         <div style="flex: 1; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                            Delivery Fee <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span class="delivery-currency-sym">$</span>)</span>
+                                            Delivery Fee <span
+                                                style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(<span
+                                                    class="delivery-currency-sym">$</span>)</span>
                                         </div>
-                                        <div style="flex: 1.5; font-size: 0.78rem; font-weight: 600; color: var(--text);">
-                                            Free Order Min <span style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional <span class="delivery-currency-sym">$</span>)</span>
+                                        <div
+                                            style="flex: 1.5; font-size: 0.78rem; font-weight: 600; color: var(--text);">
+                                            Free Order Min <span
+                                                style="font-size: 0.72rem; color: var(--muted); font-weight: normal;">(Optional
+                                                <span class="delivery-currency-sym">$</span>)</span>
                                         </div>
                                         <div style="width: 28px;"></div>
                                     </div>
@@ -3229,28 +3408,39 @@
                                         <!-- Dynamic rows added here -->
                                     </div>
                                     <button type="button" class="auth-submit-btn" data-ui="add-delivery-tier-btn"
-                                        style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+ Add Distance Tier</button>
-                                    
+                                        style="background: var(--brand-dark); margin-bottom: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem;">+
+                                        Add Distance Tier</button>
+
                                     <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
-                                    
+
                                     <!-- Fallback Setting (Deliver all over) -->
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                        <input type="checkbox" id="edit-allow-fallback" data-ui="allow-fallback" style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
-                                        <label for="edit-allow-fallback" style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over (allow delivery beyond maximum tier distance)</label>
+                                        <input type="checkbox" id="edit-allow-fallback" data-ui="allow-fallback"
+                                            style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
+                                        <label for="edit-allow-fallback"
+                                            style="font-weight: 500; cursor: pointer; margin: 0;">Deliver all over
+                                            (allow delivery beyond maximum tier distance)</label>
                                     </div>
-                                    <div data-ui="fallback-inputs" style="display: none; padding-left: 24px; gap: 15px;">
+                                    <div data-ui="fallback-inputs"
+                                        style="display: none; padding-left: 24px; gap: 15px;">
                                         <div style="flex: 1; margin-bottom: 10px;">
-                                            <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers (<span class="delivery-currency-sym">$</span>)</label>
-                                            <input type="number" step="0.01" min="0" data-ui="fallback-fee" placeholder="0.00" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                            <label style="font-size: 0.8rem; font-weight: 500;">Flat Fee Beyond Tiers
+                                                (<span class="delivery-currency-sym">$</span>)</label>
+                                            <input type="number" step="0.01" min="0" data-ui="fallback-fee"
+                                                placeholder="0.00"
+                                                style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
                                         </div>
                                         <div style="flex: 1; margin-bottom: 10px;">
-                                            <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free Delivery (<span class="delivery-currency-sym">$</span>)</label>
-                                            <input type="number" step="0.01" min="0" data-ui="fallback-min-free" placeholder="Leave empty for no limit" style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
+                                            <label style="font-size: 0.8rem; font-weight: 500;">Min Order for Free
+                                                Delivery (<span class="delivery-currency-sym">$</span>)</label>
+                                            <input type="number" step="0.01" min="0" data-ui="fallback-min-free"
+                                                placeholder="Leave empty for no limit"
+                                                style="padding: 6px 10px; font-size: 0.85rem; width: 100%;">
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="form-group" style="margin-bottom: 20px;">
                                 <label>Where do you deliver?</label>
                                 <div class="field-hint"
@@ -3264,6 +3454,8 @@
                                         style="flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.9rem; font-weight: 600;">States</button>
                                     <button type="button" class="type-btn" data-value="cities"
                                         style="flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.9rem; font-weight: 600;">Cities</button>
+                                    <button type="button" class="type-btn" data-value="streets"
+                                        style="flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--text); cursor: pointer; font-size: 0.9rem; font-weight: 600;">Streets</button>
                                 </div>
                                 <input type="hidden" name="deliveryCoverageType" data-ui="delivery-coverage-type"
                                     value="">
@@ -3276,34 +3468,19 @@
                                         title="Required">*</span></label>
                                 <div class="input-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                    Add the countries where your delivery service is available.</div>
-                                <div class="custom-select-wrapper" data-ui="countries-picker-wrapper">
-                                    <button type="button" class="auth-submit-btn" data-ui="countries-trigger"
-                                        data-placeholder="Choose Countries"
-                                        style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                        Countries/Provinces</button>
-                                    <div class="selected-chips" data-ui="countries-selected-chips"
-                                        style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                    Search and add the countries where your delivery service is available.</div>
+                                <div style="position: relative;">
+                                    <input type="text" class="search-input" data-ui="delivery-countries-input"
+                                        placeholder="Type country name (e.g. Nigeria, United States, Canada)..."
+                                        style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                    <div data-ui="seller-countries-suggestions"
+                                        style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                     </div>
-                                    <div class="custom-select-dropdown" data-ui="countries-dropdown">
-                                        <div class="search-box">
-                                            <input type="text" placeholder="Search countries..." class="search-input"
-                                                data-ui="countries-search-input">
-                                        </div>
-                                        <div class="select-all-container"
-                                            style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                            <input type="checkbox" data-ui="countries-select-all-checkbox"
-                                                id="countries-select-all-modal"
-                                                style="width: 18px; height: 18px; cursor: pointer;">
-                                            <label for="countries-select-all-modal"
-                                                style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                                All</label>
-                                        </div>
-                                        <div class="options-list" data-ui="countries-options-list"></div>
-                                    </div>
-                                    <input type="hidden" name="deliveryCountries" data-ui="delivery-countries"
-                                        value="[]">
                                 </div>
+                                <div data-ui="seller-countries-chips"
+                                    style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                </div>
+                                <input type="hidden" name="deliveryCountries" data-ui="delivery-countries" value="[]">
                             </div>
 
                             <div class="form-group" data-ui="delivery-states-section"
@@ -3312,35 +3489,20 @@
                                         title="Required">*</span></label>
                                 <div class="input-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                    Add the states or regions where your delivery service is available within the
-                                    selected countries. Add all states/regions if delivery covers the entire country.
+                                    Search and add the states/provinces where your delivery service is available.
                                 </div>
-                                <div class="custom-select-wrapper" data-ui="states-picker-wrapper">
-                                    <button type="button" class="auth-submit-btn" data-ui="states-trigger"
-                                        data-placeholder="Choose States"
-                                        style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                        States/Provinces</button>
-                                    <div class="selected-chips" data-ui="states-selected-chips"
-                                        style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                <div style="position: relative;">
+                                    <input type="text" class="search-input" data-ui="delivery-states-input"
+                                        placeholder="Type state or province (e.g. Lagos, California, Ontario, Texas)..."
+                                        style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                    <div data-ui="seller-states-suggestions"
+                                        style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                     </div>
-                                    <div class="custom-select-dropdown" data-ui="states-dropdown">
-                                        <div class="search-box">
-                                            <input type="text" placeholder="Search states..." class="search-input"
-                                                data-ui="states-search-input">
-                                        </div>
-                                        <div class="select-all-container"
-                                            style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                            <input type="checkbox" data-ui="states-select-all-checkbox"
-                                                id="states-select-all-modal"
-                                                style="width: 18px; height: 18px; cursor: pointer;">
-                                            <label for="states-select-all-modal"
-                                                style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                                All</label>
-                                        </div>
-                                        <div class="options-list" data-ui="states-options-list"></div>
-                                    </div>
-                                    <input type="hidden" name="deliveryStates" data-ui="delivery-states" value="[]">
                                 </div>
+                                <div data-ui="seller-states-chips"
+                                    style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                </div>
+                                <input type="hidden" name="deliveryStates" data-ui="delivery-states" value="[]">
                             </div>
 
                             <div class="form-group" data-ui="delivery-cities-section"
@@ -3348,34 +3510,68 @@
                                 <label>Select Cities</label>
                                 <div class="input-hint"
                                     style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
-                                    Add the specific cities where your delivery service is available within the selected
-                                    states. Add all cities if delivery covers the entire state.</div>
-                                <div class="custom-select-wrapper" data-ui="cities-picker-wrapper">
-                                    <button type="button" class="auth-submit-btn" data-ui="cities-trigger"
-                                        data-placeholder="Choose Cities"
-                                        style="background: var(--brand); width: auto; padding: 8px 20px; margin-bottom: 10px; display: block !important;">Choose
-                                        Cities</button>
-                                    <div class="selected-chips" data-ui="cities-selected-chips"
-                                        style="padding: 4px 0; min-height: 20px; margin-bottom: 10px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted);">
+                                    Search and add the specific cities where your delivery service is available.</div>
+                                <div style="position: relative;">
+                                    <input type="text" class="search-input" data-ui="delivery-cities-input"
+                                        placeholder="Type city name (e.g. Ikeja, Lagos, Los Angeles, London, Toronto)..."
+                                        style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                    <div data-ui="seller-cities-suggestions"
+                                        style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
                                     </div>
-                                    <div class="custom-select-dropdown" data-ui="cities-dropdown">
-                                        <div class="search-box">
-                                            <input type="text" placeholder="Search cities..." class="search-input"
-                                                data-ui="cities-search-input">
-                                        </div>
-                                        <div class="select-all-container"
-                                            style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
-                                            <input type="checkbox" data-ui="cities-select-all-checkbox"
-                                                id="cities-select-all-modal"
-                                                style="width: 18px; height: 18px; cursor: pointer;">
-                                            <label for="cities-select-all-modal"
-                                                style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Select
-                                                All</label>
-                                        </div>
-                                        <div class="options-list" data-ui="cities-options-list"></div>
-                                    </div>
-                                    <input type="hidden" name="deliveryCities" data-ui="delivery-cities" value="[]">
                                 </div>
+                                <div data-ui="seller-cities-chips"
+                                    style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                </div>
+                                <input type="hidden" name="deliveryCities" data-ui="delivery-cities" value="[]">
+                            </div>
+
+                            <div class="form-group" data-ui="delivery-streets-section"
+                                style="display: none; margin-bottom: 15px;">
+                                <label for="delivery-streets-modal">Allowed Streets / Neighborhoods</label>
+                                <div class="input-hint"
+                                    style="font-size: 0.8rem; color: var(--muted); margin-top: -5px; margin-bottom: 10px; line-height: 1.4;">
+                                    Search and select the specific streets, districts, or neighborhoods where you
+                                    deliver (with 1 km spread buffer).</div>
+                                <div style="position: relative;">
+                                    <input type="text" class="search-input" data-ui="delivery-streets-input"
+                                        placeholder="Type a street or neighborhood (e.g. Maryland, Broadway, Ikeja GRA)..."
+                                        style="width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; font-size: 0.9rem; outline: none; background: white; color: var(--text);">
+                                    <div data-ui="seller-streets-suggestions"
+                                        style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 100; margin-top: 4px;">
+                                    </div>
+                                </div>
+
+                                <!-- Selected Street Chips -->
+                                <div data-ui="seller-streets-chips"
+                                    style="padding: 6px 0; min-height: 24px; margin-top: 6px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                </div>
+
+                                <!-- Fallback Landmark Prompt for Seller -->
+                                <div data-ui="seller-landmark-prompt"
+                                    style="display: none; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.4); font-size: 0.82rem; color: var(--text);">
+                                    <div
+                                        style="font-weight: 600; color: #d97706; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> Location not pinpointed on map
+                                    </div>
+                                    <div style="color: var(--muted); margin-bottom: 8px; line-height: 1.35;">
+                                        Map cannot locate "<span data-ui="unresolved-seller-street"
+                                            style="font-weight: 600; color: var(--text);"></span>". Please enter a
+                                        nearest popular landmark (e.g. school, bank, junction, bus stop) to anchor this
+                                        area:
+                                    </div>
+                                    <div style="display: flex; gap: 6px;">
+                                        <input type="text" data-ui="seller-landmark-input"
+                                            placeholder="Nearest landmark (e.g. City Bank, Central Junction)..."
+                                            style="flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem; outline: none; background: white; color: var(--text);">
+                                        <button type="button" data-ui="apply-seller-landmark-btn"
+                                            style="background: var(--brand); color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">Add
+                                            Area</button>
+                                    </div>
+                                </div>
+
+                                <input type="hidden" name="deliveryStreets" data-ui="delivery-streets" value="[]">
+                                <input type="hidden" name="deliveryStreetPoints" data-ui="delivery-street-points"
+                                    value="[]">
                             </div>
                         </div>
 
@@ -3512,7 +3708,9 @@
                                     <button type="button" class="custom-select-trigger"
                                         data-ui="market-category-mobile-trigger"
                                         style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; padding: 0 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; width: 100%; justify-content: space-between; font-weight: 500;">
-                                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍 All Categories</span>
+                                        <span
+                                            style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍
+                                            All Categories</span>
                                         <i class="fa-solid fa-chevron-down"
                                             style="font-size: 0.75rem; color: var(--muted); margin-left: 8px;"></i>
                                     </button>
@@ -3557,7 +3755,9 @@
                                 <button type="button" class="custom-select-trigger"
                                     data-ui="general-market-category-trigger"
                                     style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; padding: 0 12px; border: 1px solid var(--border); background: white; cursor: pointer; min-width: 170px; max-width: 250px; justify-content: space-between; font-weight: 500; color: var(--text);">
-                                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍 All Categories</span>
+                                    <span
+                                        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; flex: 1;">🔍
+                                        All Categories</span>
                                     <i class="fa-solid fa-chevron-down"
                                         style="font-size: 0.75rem; color: var(--muted); margin-left: 8px;"></i>
                                 </button>
@@ -3697,9 +3897,8 @@
             <div class="audio-source-menu" data-ui="audio-source-menu" style="display: none;"></div>
             <div class="pip-resize-handle" data-ui="pip-resize-handle"></div>
             <div class="video-container" data-ui="video-container" style="display: none;">
-                <div class="remote-videos-grid" data-ui="remote-videos-grid">
-                    <video id="remote-video" data-ui="remote-video" autoplay playsinline></video>
-                </div>
+                <audio id="remote-audio" data-ui="remote-audio" autoplay playsinline style="display: none;"></audio>
+                <video id="remote-video" data-ui="remote-video" autoplay playsinline style="display: none;"></video>
                 <div class="remote-mute-overlay" data-ui="remote-mute-overlay" style="display: none;">
                     <i class="fa-solid fa-video-slash"></i>
                     <p>Camera Off</p>

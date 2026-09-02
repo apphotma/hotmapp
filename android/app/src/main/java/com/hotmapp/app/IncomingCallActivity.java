@@ -1,6 +1,8 @@
 package com.hotmapp.app;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -51,10 +53,21 @@ public class IncomingCallActivity extends Activity {
 
     private void handleCallDecision(String callId, boolean accepted) {
         Log.d(TAG, "handleCallDecision callId=" + callId + " accepted=" + accepted);
-        // TODO: wire this to your call signaling / database path for accept/reject
-        // For example, update calls/{calleeUid}/{callerUid} or invoke a native module
+        if (accepted) {
+            Intent mainIntent = new Intent(this, MainActivity.class);
+            mainIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            mainIntent.putExtra("callAction", "accept");
+            mainIntent.putExtra("callId", callId);
+            startActivity(mainIntent);
+        }
 
-        // Close the incoming call UI after the action
+        try {
+            android.app.NotificationManager notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null && callId != null) {
+                notificationManager.cancel(callId.hashCode());
+            }
+        } catch (Exception ignored) {}
+
         finish();
     }
 }

@@ -12,7 +12,8 @@ import { subscribeToAuthChanges } from './auth-service.js';
 import { getCachedProductsByOwner, cacheItem } from './cache-manager.js';
 import { setShopModeVisibility } from './shop-mode.js';
 import { resolveActiveSellerId } from './shop-seller-utils.js';
-
+import { validateDeliveryCoverage } from './delivery-coverage-utils.js';
+import { initDeliveryAddressAutocomplete } from './delivery-address-autocomplete.js';
 
 let cart = [];
 let savedItems = [];
@@ -41,9 +42,32 @@ export const setSelectedDeliveryCoordinates = (coords) => {
     }
 };
 
+let cachedDeliveryCoverage = null;
+let lastDeliveryCoverageError = '';
+
+export { validateDeliveryCoverage };
+
 const calculateShippingFee = (subtotal) => {
     if (deliveryMethod !== 'delivery') return 0;
     
+    // Check regional & street coverage
+    const currentAddr = addressMode === 'simple' ? 
+        (elements.deliveryAddressInput?.value.trim() || '') : 
+        `${elements.addrStreet?.value.trim() || ''}, ${elements.addrCity?.value.trim() || ''}, ${elements.addrState?.value.trim() || ''}`;
+        
+    const coverageResult = validateDeliveryCoverage(
+        currentAddr, 
+        selectedDeliveryCoordinates, 
+        cachedDeliveryCoverage, 
+        { lat: cachedStoreLatitude, lng: cachedStoreLongitude }
+    );
+
+    if (!coverageResult.isCovered) {
+        lastDeliveryCoverageError = coverageResult.reason;
+        return -1; // Out of range / outside coverage area!
+    }
+    lastDeliveryCoverageError = '';
+
     const isFreeDelivery = cachedMinFreeDelivery > 0 && subtotal >= cachedMinFreeDelivery;
     let fee = isFreeDelivery ? 0 : cachedDeliveryFee;
     
@@ -64,6 +88,7 @@ const calculateShippingFee = (subtotal) => {
                     const isFallbackFree = minFree > 0 && subtotal >= minFree;
                     fee = isFallbackFree ? 0 : cachedFallbackFee;
                 } else {
+                    lastDeliveryCoverageError = `Store delivery distance (${distance.toFixed(1)} km) exceeds maximum delivery radius.`;
                     fee = -1; // Out of range!
                 }
             }
@@ -225,6 +250,7 @@ export const updateShopPickupLocations = async (bizProfile, userCoords = null, c
     cachedAllowFallback = !!(bizProfile?.allowFallback ?? cachedBizProfile?.allowFallback);
     cachedFallbackFee = parsePrice((bizProfile?.fallbackFee ?? cachedBizProfile?.fallbackFee) || 0);
     cachedFallbackMinFreeOrder = parsePrice((bizProfile?.fallbackMinFreeOrder ?? cachedBizProfile?.fallbackMinFreeOrder) || 0);
+    cachedDeliveryCoverage = (bizProfile?.deliveryCoverage ?? cachedBizProfile?.deliveryCoverage) || null;
 
     const firstLoc = locations[0];
     if (firstLoc && firstLoc.latitude && firstLoc.longitude) {
@@ -1253,6 +1279,113 @@ export const initShop = () => {
                 elements.deliveryAddressCharCount.style.color = 'var(--muted)';
             }
         }
+        if (window._updateCartUI) window._updateCartUI();
+    });
+
+    ['input', 'change'].forEach(evt => {
+        elements.addrStreet?.addEventListener(evt, () => { if (window._updateCartUI) window._updateCartUI(); });
+        elements.addrCity?.addEventListener(evt, () => { if (window._updateCartUI) window._updateCartUI(); });
+        elements.addrState?.addEventListener(evt, () => { if (window._updateCartUI) window._updateCartUI(); });
+    });
+
+    // Initialize Autocomplete & Landmark detection
+    const suggestionsDropdown = document.querySelector('[data-ui="delivery-address-suggestions"]');
+    const landmarkPrompt = document.querySelector('[data-ui="delivery-landmark-prompt"]');
+    const landmarkInput = document.querySelector('[data-ui="delivery-landmark-input"]');
+    const applyLandmarkBtn = document.querySelector('[data-ui="apply-landmark-btn"]');
+    const landmarkSuggestionsList = document.querySelector('[data-ui="landmark-suggestions-list"]');
+
+    if (elements.deliveryAddressInput && suggestionsDropdown) {
+        initDeliveryAddressAutocomplete({
+            inputElement: elements.deliveryAddressInput,
+            suggestionsContainer: suggestionsDropdown,
+            landmarkPromptContainer: landmarkPrompt,
+            onSelect: ({ address, lat, lng }) => {
+                setSelectedDeliveryCoordinates({ lat, lng });
+                if (window._updateCartUI) window._updateCartUI();
+            }
+        });
+    }
+
+    if (elements.addrStreet && suggestionsDropdown) {
+        initDeliveryAddressAutocomplete({
+            inputElement: elements.addrStreet,
+            suggestionsContainer: suggestionsDropdown,
+            landmarkPromptContainer: landmarkPrompt,
+            onSelect: ({ address, lat, lng }) => {
+                setSelectedDeliveryCoordinates({ lat, lng });
+                if (window._updateCartUI) window._updateCartUI();
+            }
+        });
+    }
+
+    // Handle Landmark detection when street could not be pinpointed
+    const resolveLandmark = async () => {
+        const query = landmarkInput?.value.trim();
+        if (!query) {
+            showToast("Please enter a landmark (e.g. school, bank, junction).", "warning");
+            return;
+        }
+
+        if (applyLandmarkBtn) {
+            applyLandmarkBtn.disabled = true;
+            applyLandmarkBtn.innerHTML = '<span class="spinner" style="width:10px; height:10px; border-width:2px; margin:0;"></span>';
+        }
+
+        try {
+            const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4`);
+            const results = await resp.json();
+
+            if (results && results.length > 0) {
+                const best = results[0];
+                const lat = parseFloat(best.lat);
+                const lng = parseFloat(best.lon);
+
+                setSelectedDeliveryCoordinates({ lat, lng });
+
+                // Append landmark to current address
+                if (addressMode === 'simple' && elements.deliveryAddressInput) {
+                    const currentVal = elements.deliveryAddressInput.value.trim();
+                    if (currentVal && !currentVal.toLowerCase().includes(query.toLowerCase())) {
+                        elements.deliveryAddressInput.value = `${currentVal} (Near: ${best.display_name})`;
+                    } else if (!currentVal) {
+                        elements.deliveryAddressInput.value = best.display_name;
+                    }
+                    elements.deliveryAddressInput.dispatchEvent(new Event('input', { bubbles: true }));
+                } else if (elements.addrStreet) {
+                    const currentVal = elements.addrStreet.value.trim();
+                    if (currentVal && !currentVal.toLowerCase().includes(query.toLowerCase())) {
+                        elements.addrStreet.value = `${currentVal} (Near ${query})`;
+                    }
+                    elements.addrStreet.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+
+                if (landmarkPrompt) landmarkPrompt.style.display = 'none';
+                if (landmarkSuggestionsList) landmarkSuggestionsList.style.display = 'none';
+                if (landmarkInput) landmarkInput.value = '';
+
+                showToast("Nearest landmark detected & coordinates resolved!", "success");
+                if (window._updateCartUI) window._updateCartUI();
+            } else {
+                showToast("Could not locate this landmark. Try a different landmark or pick on map.", "warning");
+            }
+        } catch (err) {
+            console.error("Landmark detection error:", err);
+            showToast("Error locating landmark.", "error");
+        } finally {
+            if (applyLandmarkBtn) {
+                applyLandmarkBtn.disabled = false;
+                applyLandmarkBtn.textContent = 'Detect';
+            }
+        }
+    };
+
+    applyLandmarkBtn?.addEventListener('click', resolveLandmark);
+    landmarkInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            resolveLandmark();
+        }
     });
 
     elements.shopPickupLocationsList?.addEventListener('click', (e) => {
@@ -1353,6 +1486,7 @@ export const initShop = () => {
                     ${data.deliveryCoverage?.countries?.length ? `<p style="margin-top: 4px;"><strong>Countries:</strong> ${data.deliveryCoverage.countries.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.states?.length ? `<p style="margin-top: 4px;"><strong>States:</strong> ${data.deliveryCoverage.states.join(', ')}</p>` : ''}
                     ${data.deliveryCoverage?.cities?.length ? `<p style="margin-top: 4px;"><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>` : ''}
+                    ${data.deliveryCoverage?.streets?.length ? `<p style="margin-top: 4px;"><strong>Streets / Areas:</strong> ${data.deliveryCoverage.streets.join(', ')}</p>` : ''}
                     ${data.deliveryFee ? `<p style="margin-top: 4px;">Base Fee: ${data.currency || '$'}${formatPriceWithCommas(data.deliveryFee)}</p>` : ''}
                     ${data.minFreeDelivery ? `<p style="margin-top: 4px;">Free Delivery threshold: ${data.currency || '$'}${formatPriceWithCommas(data.minFreeDelivery)}</p>` : ''}
                 </div>
@@ -2268,6 +2402,17 @@ const handleStarRating = (e) => {
             }
             if (deliveryAddress.length > MAX_DELIVERY_ADDRESS_LENGTH) {
                 showToast(`Aggregated delivery address exceeds ${MAX_DELIVERY_ADDRESS_LENGTH} characters.`, "warning");
+                return;
+            }
+
+            const coverageCheck = validateDeliveryCoverage(
+                deliveryAddress,
+                selectedDeliveryCoordinates,
+                cachedDeliveryCoverage,
+                { lat: cachedStoreLatitude, lng: cachedStoreLongitude }
+            );
+            if (!coverageCheck.isCovered) {
+                showToast(coverageCheck.reason || "Your delivery address is outside the seller's delivery coverage area.", "error");
                 return;
             }
         }

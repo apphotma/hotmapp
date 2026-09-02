@@ -2,12 +2,27 @@ import { db } from './firebase-config.js';
 import { ref, onValue, get, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 import { elements } from './elements.js';
 
+export const getAppPlatform = () => {
+    if (
+        window.Capacitor?.isNativePlatform?.() ||
+        window.Capacitor?.getPlatform?.() === 'android' ||
+        window.AndroidBridge ||
+        (window.location.protocol === 'https:' && window.location.hostname === 'hotmapp.shop') ||
+        (window.location.protocol === 'http:' && window.location.hostname === 'localhost')
+    ) {
+        return 'android';
+    }
+    return 'web';
+};
+
 // Current App Build Constants
 export const APP_METADATA = {
-    version: '1.0.3',       // Native Android versionName
-    versionCode: 29,        // Native Android versionCode
-    webVersion: '1.1.20',   // Web build version
-    platform: (window.Capacitor?.isNativePlatform?.() || window.AndroidBridge) ? 'android' : 'web'
+    version: '1.0.7',       // Native Android versionName
+    versionCode: 33,        // Native Android versionCode
+    webVersion: '1.1.21',   // Web build version
+    get platform() {
+        return getAppPlatform();
+    }
 };
 
 /**
@@ -39,13 +54,13 @@ export const compareVersions = (v1, v2) => {
  * Displays the non-dismissible Force Update dialog.
  */
 const showForceUpdateModal = (config) => {
-    const isAndroid = APP_METADATA.platform === 'android';
+    const isAndroid = getAppPlatform() === 'android';
     const modal = elements.forceUpdateModal;
     if (!modal) return;
 
     const currentVer = isAndroid ? `v${APP_METADATA.version}` : `v${APP_METADATA.webVersion}`;
     const latestVer = isAndroid ? `v${config.android_latest_version || config.android_min_version || 'Latest'}` : `v${config.web_latest_version || config.web_min_version || 'Latest'}`;
-    const updateUrl = isAndroid 
+    const updateUrl = isAndroid
         ? (config.android_update_url || "https://play.google.com/store/apps/details?id=com.hotmapp.app")
         : (config.web_update_url || "https://hotma-app.web.app");
 
@@ -119,7 +134,7 @@ export const initAppVersionChecker = () => {
         const config = snapshot.val();
         if (!config) return;
 
-        const isAndroid = APP_METADATA.platform === 'android';
+        const isAndroid = getAppPlatform() === 'android';
         let updateRequired = false;
 
         if (isAndroid) {

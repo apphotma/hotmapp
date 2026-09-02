@@ -3403,39 +3403,231 @@ export const initStore = () => {
             const countriesSec = form.querySelector('[data-ui="delivery-countries-section"]'); // Section visibility
             const statesSec = form.querySelector('[data-ui="delivery-states-section"]'); // Section visibility
             const citiesSec = form.querySelector('[data-ui="delivery-cities-section"]'); // Section visibility
+            const streetsSec = form.querySelector('[data-ui="delivery-streets-section"]'); // Section visibility
             const countriesWrapper = form.querySelector('[data-ui="countries-picker-wrapper"]');
             const statesWrapper = form.querySelector('[data-ui="states-picker-wrapper"]'); // For setupMultiSelect
             const citiesWrapper = form.querySelector('[data-ui="cities-picker-wrapper"]'); // For setupMultiSelect
 
             if (countriesSec) countriesSec.style.display = (type === 'country') ? 'block' : 'none';
-            if (statesSec) statesSec.style.display = (type === 'states' || type === 'cities') ? 'block' : 'none'; // Show states section if type is states or cities
-            if (citiesSec) citiesSec.style.display = (type === 'cities') ? 'block' : 'none'; // Show cities section only if type is cities
+            if (statesSec) statesSec.style.display = (type === 'states') ? 'block' : 'none';
+            if (citiesSec) citiesSec.style.display = (type === 'cities') ? 'block' : 'none';
+            if (streetsSec) streetsSec.style.display = (type === 'streets') ? 'block' : 'none';
+        });
+    });
 
-            if (type === 'country') {
-                if (countriesWrapper) setupMultiSelect(countriesWrapper, []);
-                if (!isPopulating) {
-                    if (statesWrapper) setupMultiSelect(statesWrapper, []);
-                    if (citiesWrapper) setupMultiSelect(citiesWrapper, []);
-                }
-            } else if (type === 'states' || type === 'cities') {
-                if (!isPopulating) {
-                    if (countriesWrapper) setupMultiSelect(countriesWrapper, []);
-                }
-                refreshStatesList(form);
+    const setupSellerLocationManager = (form, type) => {
+        if (!form) return;
+        const input = form.querySelector(`[data-ui="delivery-${type}-input"]`);
+        const suggestionsBox = form.querySelector(`[data-ui="seller-${type}-suggestions"]`);
+        const chipsContainer = form.querySelector(`[data-ui="seller-${type}-chips"]`);
+        const hiddenInput = form.querySelector(`[data-ui="delivery-${type}"]`);
+        const hiddenPoints = (type === 'streets') ? form.querySelector('[data-ui="delivery-street-points"]') : null;
+        const landmarkPrompt = (type === 'streets') ? form.querySelector('[data-ui="seller-landmark-prompt"]') : null;
+        const landmarkInput = (type === 'streets') ? form.querySelector('[data-ui="seller-landmark-input"]') : null;
+        const applyLandmarkBtn = (type === 'streets') ? form.querySelector('[data-ui="apply-seller-landmark-btn"]') : null;
+        const unresolvedSpan = (type === 'streets') ? form.querySelector('[data-ui="unresolved-seller-street"]') : null;
 
-                if (type === 'cities') {
-                    refreshCitiesList(form);
-                } else {
-                    // If switching to 'states' only, clear cities unless populating
-                    if (!isPopulating && citiesWrapper) setupMultiSelect(citiesWrapper, []);
+        if (!input || !chipsContainer || !hiddenInput) return;
+
+        let itemsList = [];
+        let streetPoints = [];
+
+        const syncToHidden = () => {
+            hiddenInput.value = JSON.stringify(itemsList);
+            if (hiddenPoints) hiddenPoints.value = JSON.stringify(streetPoints);
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
+        const renderChips = () => {
+            chipsContainer.innerHTML = itemsList.map((item, idx) => `
+                <div class="custom-chip" style="background: rgba(var(--brand-rgb, 12, 140, 233), 0.12); color: var(--brand); border: 1px solid rgba(var(--brand-rgb, 12, 140, 233), 0.3); border-radius: 16px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 500;">
+                    <span>${item}</span>
+                    <span class="remove-chip-btn" data-index="${idx}" style="cursor: pointer; font-size: 1rem; line-height: 1; font-weight: 700; color: var(--muted);">&times;</span>
+                </div>
+            `).join('');
+
+            chipsContainer.querySelectorAll('.remove-chip-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.dataset.index);
+                    itemsList.splice(idx, 1);
+                    if (streetPoints.length > idx) streetPoints.splice(idx, 1);
+                    syncToHidden();
+                    renderChips();
+                });
+            });
+        };
+
+        const addItem = (name, point = null) => {
+            const trimmed = (name || '').trim();
+            if (!trimmed) return;
+            if (!itemsList.includes(trimmed)) {
+                itemsList.push(trimmed);
+                if (type === 'streets') {
+                    streetPoints.push(point || { name: trimmed, lat: null, lng: null });
                 }
-            } else {
-                // If coverage type is other, clear selections unless populating
-                if (!isPopulating) {
-                    if (countriesWrapper) setupMultiSelect(countriesWrapper, []);
-                    if (statesWrapper) setupMultiSelect(statesWrapper, []);
-                    if (citiesWrapper) setupMultiSelect(citiesWrapper, []);
+                syncToHidden();
+                renderChips();
+            }
+            input.value = '';
+            if (suggestionsBox) suggestionsBox.style.display = 'none';
+            if (landmarkPrompt) landmarkPrompt.style.display = 'none';
+        };
+
+        form[`_loadSeller_${type}`] = (items = [], points = []) => {
+            itemsList = Array.isArray(items) ? [...items] : [];
+            if (type === 'streets') {
+                streetPoints = Array.isArray(points) ? [...points] : [];
+            }
+            syncToHidden();
+            renderChips();
+        };
+
+        const searchLocation = debounce(async (query) => {
+            const trimmed = (query || '').trim();
+            if (trimmed.length < 2) {
+                if (suggestionsBox) suggestionsBox.style.display = 'none';
+                if (landmarkPrompt) landmarkPrompt.style.display = 'none';
+                return;
+            }
+
+            if (suggestionsBox) {
+                suggestionsBox.innerHTML = `
+                    <div style="padding: 10px 14px; color: var(--muted); font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                        <span class="spinner" style="width: 14px; height: 14px; border-width: 2px; border-top-color: var(--brand); margin: 0;"></span>
+                        Searching ${type}...
+                    </div>
+                `;
+                suggestionsBox.style.display = 'block';
+            }
+
+            try {
+                let searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&limit=6&addressdetails=1`;
+                if (type === 'countries') {
+                    searchUrl += `&featuretype=country`;
                 }
+
+                const resp = await fetch(searchUrl);
+                const results = await resp.json();
+
+                if (!results || results.length === 0) {
+                    if (suggestionsBox) suggestionsBox.style.display = 'none';
+                    if (landmarkPrompt) {
+                        landmarkPrompt.style.display = 'block';
+                        if (unresolvedSpan) unresolvedSpan.textContent = trimmed;
+                    }
+                    return;
+                }
+
+                if (landmarkPrompt) landmarkPrompt.style.display = 'none';
+
+                if (suggestionsBox) {
+                    suggestionsBox.innerHTML = results.map((item, idx) => {
+                        const parts = (item.display_name || '').split(',').map(p => p.trim());
+                        let mainTitle = parts[0] || item.display_name;
+                        
+                        if (type === 'countries' && item.address?.country) {
+                            mainTitle = item.address.country;
+                        } else if (type === 'states' && (item.address?.state || item.address?.province || item.address?.region)) {
+                            mainTitle = item.address.state || item.address.province || item.address.region;
+                        } else if (type === 'cities' && (item.address?.city || item.address?.town || item.address?.municipality || item.address?.suburb)) {
+                            mainTitle = item.address.city || item.address.town || item.address.municipality || item.address.suburb || parts[0];
+                        }
+
+                        const contextSubtitle = parts.filter(p => p !== mainTitle).join(', ');
+
+                        return `
+                            <div class="seller-suggestion-item" data-index="${idx}" data-lat="${item.lat}" data-lon="${item.lon}" data-title="${mainTitle.replace(/"/g, '&quot;')}" data-display="${item.display_name.replace(/"/g, '&quot;')}"
+                                style="padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 0.85rem; display: flex; align-items: flex-start; gap: 10px; transition: background 0.15s ease;">
+                                <i class="fa-solid fa-location-dot" style="color: var(--brand); margin-top: 3px; font-size: 0.9rem; flex-shrink: 0;"></i>
+                                <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+                                    <span style="color: var(--text); font-weight: 600; line-height: 1.2;">${mainTitle}</span>
+                                    ${contextSubtitle ? `<span style="color: var(--muted); font-size: 0.76rem; line-height: 1.25;">${contextSubtitle}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    suggestionsBox.style.display = 'block';
+
+                    suggestionsBox.querySelectorAll('.seller-suggestion-item').forEach(el => {
+                        el.addEventListener('mouseenter', () => { el.style.background = 'rgba(var(--brand-rgb, 12, 140, 233), 0.08)'; });
+                        el.addEventListener('mouseleave', () => { el.style.background = 'transparent'; });
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const title = el.dataset.title;
+                            const fullAddress = el.dataset.display;
+                            const lat = parseFloat(el.dataset.lat);
+                            const lng = parseFloat(el.dataset.lon);
+
+                            addItem(title, { name: title, fullAddress, lat, lng });
+                        });
+                    });
+                }
+            } catch (err) {
+                console.error(`Seller ${type} search error:`, err);
+                if (suggestionsBox) suggestionsBox.style.display = 'none';
+            }
+        }, 350);
+
+        input.addEventListener('input', (e) => searchLocation(e.target.value));
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = input.value.trim();
+                if (val) addItem(val);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (suggestionsBox && !input.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+        if (applyLandmarkBtn) {
+            applyLandmarkBtn.addEventListener('click', async () => {
+                const query = landmarkInput?.value.trim();
+                if (!query) {
+                    showToast("Please enter a landmark name.", "warning");
+                    return;
+                }
+                applyLandmarkBtn.disabled = true;
+                applyLandmarkBtn.innerHTML = '<span class="spinner" style="width:10px; height:10px; border-width:2px; margin:0;"></span>';
+                try {
+                    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                    const data = await resp.json();
+                    if (data && data.length > 0) {
+                        const item = data[0];
+                        const parts = (item.display_name || '').split(',').map(p => p.trim());
+                        const mainTitle = parts[0] || query;
+                        addItem(`${unresolvedSpan?.textContent || 'Area'} (Near ${mainTitle})`, {
+                            name: mainTitle,
+                            fullAddress: item.display_name,
+                            lat: parseFloat(item.lat),
+                            lng: parseFloat(item.lon)
+                        });
+                        landmarkInput.value = '';
+                        if (landmarkPrompt) landmarkPrompt.style.display = 'none';
+                        showToast("Landmark area added with 1 km spread!", "success");
+                    } else {
+                        showToast("Landmark not found. You can still type the street name directly and press Enter.", "warning");
+                    }
+                } catch (err) {
+                    console.error("Landmark search error:", err);
+                } finally {
+                    applyLandmarkBtn.disabled = false;
+                    applyLandmarkBtn.textContent = 'Add Area';
+                }
+            });
+        }
+    };
+
+    // Initialize on all forms for all 4 types
+    ['countries', 'states', 'cities', 'streets'].forEach(type => {
+        document.querySelectorAll('form').forEach(form => {
+            if (form.querySelector(`[data-ui="delivery-${type}-section"]`)) {
+                setupSellerLocationManager(form, type);
             }
         });
     });
@@ -3583,14 +3775,17 @@ export const initStore = () => {
             const deliveryCountries = JSON.parse(form.querySelector('[data-ui="delivery-countries"]')?.value || '[]');
             const deliveryStates = JSON.parse(form.querySelector('[data-ui="delivery-states"]')?.value || '[]');
             const deliveryCities = JSON.parse(form.querySelector('[data-ui="delivery-cities"]')?.value || '[]');
+            const deliveryStreets = JSON.parse(form.querySelector('[data-ui="delivery-streets"]')?.value || '[]');
 
             const countriesTrigger = form.querySelector('[data-ui="countries-trigger"]');
             const statesTrigger = form.querySelector('[data-ui="states-trigger"]');
             const citiesTrigger = form.querySelector('[data-ui="cities-trigger"]');
+            const streetsInput = form.querySelector('[data-ui="delivery-streets-input"]');
             const deliveryCoverageError = form.querySelector('[data-ui="delivery-coverage-error"]');
             if (countriesTrigger) countriesTrigger.classList.remove('invalid', 'valid', 'input-shake');
             if (statesTrigger) statesTrigger.classList.remove('invalid', 'valid', 'input-shake');
             if (citiesTrigger) citiesTrigger.classList.remove('invalid', 'valid', 'input-shake');
+            if (streetsInput) streetsInput.classList.remove('invalid', 'valid', 'input-shake');
             if (deliveryCoverageError) deliveryCoverageError.textContent = "";
 
             if (serviceType === 'delivery' || serviceType === 'both') {
@@ -3619,6 +3814,13 @@ export const initStore = () => {
                     if (deliveryCoverageError) deliveryCoverageError.textContent = "Please select at least one city.";
                 } else if (citiesTrigger && coverageType === 'cities') {
                     citiesTrigger.classList.add('valid');
+                } else if (coverageType === 'streets' && deliveryStreets.length === 0) {
+                    showToast("Please enter at least one street or neighborhood for delivery coverage.", "error");
+                    isValid = false;
+                    if (streetsInput) { void streetsInput.offsetWidth; streetsInput.classList.add('invalid', 'input-shake'); }
+                    if (deliveryCoverageError) deliveryCoverageError.textContent = "Please enter at least one street or neighborhood.";
+                } else if (streetsInput && coverageType === 'streets') {
+                    streetsInput.classList.add('valid');
                 }
             }
         }
@@ -3832,6 +4034,12 @@ export const initStore = () => {
                 if (coverageType === 'cities' && deliveryCities.length === 0) {
                     showToast("Please select at least one city for delivery coverage.", "error");
                     if (deliveryCoverageError) deliveryCoverageError.textContent = "Please select at least one city.";
+                    return;
+                }
+                const deliveryStreets = JSON.parse(form.querySelector('[data-ui="delivery-streets"]')?.value || '[]');
+                if (coverageType === 'streets' && deliveryStreets.length === 0) {
+                    showToast("Please enter at least one street or neighborhood for delivery coverage.", "error");
+                    if (deliveryCoverageError) deliveryCoverageError.textContent = "Please enter at least one street or neighborhood.";
                     return;
                 }
             }
@@ -4197,7 +4405,9 @@ const prepareRegistrationData = (form = null) => {
             type: form.querySelector('[data-ui="delivery-coverage-type"]')?.value || 'country',
             countries: JSON.parse(form.querySelector('[data-ui="delivery-countries"]')?.value || '[]'),
             states: JSON.parse(form.querySelector('[data-ui="delivery-states"]')?.value || '[]'),
-            cities: JSON.parse(form.querySelector('[data-ui="delivery-cities"]')?.value || '[]')
+            cities: JSON.parse(form.querySelector('[data-ui="delivery-cities"]')?.value || '[]'),
+            streets: JSON.parse(form.querySelector('[data-ui="delivery-streets"]')?.value || '[]'),
+            streetPoints: JSON.parse(form.querySelector('[data-ui="delivery-street-points"]')?.value || '[]')
         }
     };
 };
@@ -4570,22 +4780,20 @@ const populateBusinessRegistrationForm = async (profileData, formElement) => {
         visibilityRadiusSelect.value = profileData.visibilityRadius !== undefined ? profileData.visibilityRadius : '0';
     }
 
-    // Set delivery countries
-    const countriesInput = formElement.querySelector('[data-ui="delivery-countries"]');
-    if (countriesInput && profileData.deliveryCoverage?.countries) {
-        countriesInput.value = JSON.stringify(profileData.deliveryCoverage.countries);
-    }
-
-    // Set delivery states
-    const statesInput = formElement.querySelector('[data-ui="delivery-states"]');
-    if (statesInput && profileData.deliveryCoverage?.states) {
-        statesInput.value = JSON.stringify(profileData.deliveryCoverage.states);
-    }
-
-    // Set delivery cities
-    const citiesInput = formElement.querySelector('[data-ui="delivery-cities"]');
-    if (citiesInput && profileData.deliveryCoverage?.cities) {
-        citiesInput.value = JSON.stringify(profileData.deliveryCoverage.cities);
+    // Set delivery coverage chips
+    if (profileData.deliveryCoverage) {
+        if (typeof formElement._loadSeller_countries === 'function') {
+            formElement._loadSeller_countries(profileData.deliveryCoverage.countries || []);
+        }
+        if (typeof formElement._loadSeller_states === 'function') {
+            formElement._loadSeller_states(profileData.deliveryCoverage.states || []);
+        }
+        if (typeof formElement._loadSeller_cities === 'function') {
+            formElement._loadSeller_cities(profileData.deliveryCoverage.cities || []);
+        }
+        if (typeof formElement._loadSeller_streets === 'function') {
+            formElement._loadSeller_streets(profileData.deliveryCoverage.streets || [], profileData.deliveryCoverage.streetPoints || []);
+        }
     }
 
     // Now trigger the country, service type and coverage events (once everything is set)
@@ -4659,6 +4867,7 @@ const populateReviewContent = () => {
                 ${data.deliveryCoverage?.countries?.length ? `<p><strong>Countries:</strong> ${data.deliveryCoverage.countries.join(', ')}</p>` : ''}
                 ${data.deliveryCoverage?.states?.length ? `<p><strong>States:</strong> ${data.deliveryCoverage.states.join(', ')}</p>` : ''}
                 ${data.deliveryCoverage?.cities?.length ? `<p><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>` : ''}
+                ${data.deliveryCoverage?.streets?.length ? `<p><strong>Streets / Areas:</strong> ${data.deliveryCoverage.streets.join(', ')}</p>` : ''}
                 ${data.deliveryFee ? `<p>Base Fee: ${data.currency || '$'}${data.deliveryFee.toFixed(2)}</p>` : ''}
                 ${data.minFreeDelivery ? `<p>Free Delivery threshold: ${data.currency || '$'}${data.minFreeDelivery.toFixed(2)}</p>` : ''}
             </div>
@@ -4841,16 +5050,33 @@ const setupMultiSelect = (wrapper, options, onChange = null, isLoading = false, 
     };
     
     if (isLocationPicker) {
-        // Replace the complex dropdown trigger with a simple input and an "Add" button.
+        // Replace the trigger with a chips container and autocomplete search input
         trigger.innerHTML = `
             <div class="selected-chips" data-ui="${wrapper.dataset.ui.replace('-wrapper', '-selected-chips')}"></div>
         `;
+
+        let placeholderText = 'Search or type to add...';
+        let locationType = 'city';
+        if (wrapper.dataset.ui === 'countries-picker-wrapper') {
+            placeholderText = 'Search country (e.g. Nigeria, United States, Canada)...';
+            locationType = 'country';
+        } else if (wrapper.dataset.ui === 'states-picker-wrapper') {
+            placeholderText = 'Search state/province (e.g. Lagos, California, Ontario)...';
+            locationType = 'state';
+        } else if (wrapper.dataset.ui === 'cities-picker-wrapper') {
+            placeholderText = 'Search city (e.g. Ikeja, Los Angeles, Toronto)...';
+            locationType = 'city';
+        }
         
         const manualEntryContainer = document.createElement('div');
-        manualEntryContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 8px;';
+        manualEntryContainer.className = 'location-picker-input-row';
+        manualEntryContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; position: relative;';
         manualEntryContainer.innerHTML = `
-            <input type="text" class="form-group" placeholder="Type and click Add" style="flex-grow: 1; margin: 0; padding: 8px 12px; border-radius: 6px;">
-            <button type="button" class="auth-submit-btn" style="flex-shrink: 0; padding: 8px 16px; margin: 0; font-size: 0.85rem;">Add</button>
+            <div style="flex-grow: 1; position: relative;">
+                <input type="text" class="search-input" placeholder="${placeholderText}" style="width: 100%; margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 0.88rem; border: 1.5px solid var(--border); outline: none; background: white; color: var(--text);">
+                <div class="location-suggestions-box" style="display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); z-index: 1000; margin-top: 4px;"></div>
+            </div>
+            <button type="button" class="auth-submit-btn" style="flex-shrink: 0; padding: 10px 16px; margin: 0; font-size: 0.85rem; border-radius: 8px;">Add</button>
         `;
         
         dropdown.innerHTML = ''; // Clear dropdown content
@@ -4859,14 +5085,15 @@ const setupMultiSelect = (wrapper, options, onChange = null, isLoading = false, 
 
         const manualInput = manualEntryContainer.querySelector('input');
         const addButton = manualEntryContainer.querySelector('button');
+        const suggestionsBox = manualEntryContainer.querySelector('.location-suggestions-box');
 
-        addButton.onclick = () => {
-            const value = manualInput.value.trim().replace(/,$/, '').trim(); // Trim and remove trailing comma
+        const addValue = (val) => {
+            const value = (val || '').trim().replace(/,$/, '').trim();
             const lowerCaseSelected = selected.map(s => s.toLowerCase());
             const lowerCaseValue = value.toLowerCase();
-            const hasLetters = /[a-zA-Z]/.test(value); // Check if the string contains at least one letter
+            const hasLetters = /[a-zA-Z]/.test(value);
 
-            if (!value) return; // Ignore empty submissions
+            if (!value) return;
 
             if (!hasLetters) {
                 showToast('Entry must contain at least one letter.', 'warning');
@@ -4879,8 +5106,13 @@ const setupMultiSelect = (wrapper, options, onChange = null, isLoading = false, 
             } else {
                 toggleVal(value);
                 manualInput.value = '';
+                if (suggestionsBox) suggestionsBox.style.display = 'none';
                 manualInput.focus();
             }
+        };
+
+        addButton.onclick = () => {
+            addValue(manualInput.value);
         };
 
         manualInput.onkeydown = (e) => {
@@ -4889,6 +5121,100 @@ const setupMultiSelect = (wrapper, options, onChange = null, isLoading = false, 
                 addButton.click();
             }
         };
+
+        // Live autocomplete search for countries, states, and cities
+        const searchLocation = debounce(async (query) => {
+            const trimmed = (query || '').trim();
+            if (trimmed.length < 2) {
+                if (suggestionsBox) suggestionsBox.style.display = 'none';
+                return;
+            }
+
+            if (suggestionsBox) {
+                suggestionsBox.innerHTML = `
+                    <div style="padding: 10px 14px; color: var(--muted); font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                        <span class="spinner" style="width: 14px; height: 14px; border-width: 2px; border-top-color: var(--brand); margin: 0;"></span>
+                        Searching suggestions...
+                    </div>
+                `;
+                suggestionsBox.style.display = 'block';
+            }
+
+            try {
+                // Determine search query URL
+                let searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&limit=6&addressdetails=1`;
+                if (locationType === 'country') {
+                    searchUrl += `&featuretype=country`;
+                }
+
+                const resp = await fetch(searchUrl);
+                const results = await resp.json();
+
+                if (!results || results.length === 0) {
+                    if (suggestionsBox) {
+                        suggestionsBox.innerHTML = `
+                            <div style="padding: 10px 14px; color: var(--muted); font-size: 0.85rem;">
+                                No matching suggestions. Press "Add" to add as custom entry.
+                            </div>
+                        `;
+                        suggestionsBox.style.display = 'block';
+                    }
+                    return;
+                }
+
+                if (suggestionsBox) {
+                    suggestionsBox.innerHTML = results.map((item, idx) => {
+                        const parts = (item.display_name || '').split(',').map(p => p.trim());
+                        let mainTitle = parts[0] || item.display_name;
+                        
+                        // Extract specific title based on location type
+                        if (locationType === 'country' && item.address?.country) {
+                            mainTitle = item.address.country;
+                        } else if (locationType === 'state' && (item.address?.state || item.address?.province || item.address?.region)) {
+                            mainTitle = item.address.state || item.address.province || item.address.region;
+                        } else if (locationType === 'city' && (item.address?.city || item.address?.town || item.address?.municipality || item.address?.suburb)) {
+                            mainTitle = item.address.city || item.address.town || item.address.municipality || item.address.suburb || parts[0];
+                        }
+
+                        const contextSubtitle = parts.filter(p => p !== mainTitle).join(', ');
+
+                        return `
+                            <div class="location-suggestion-item" data-index="${idx}" data-val="${mainTitle.replace(/"/g, '&quot;')}" data-full="${item.display_name.replace(/"/g, '&quot;')}"
+                                style="padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 0.85rem; display: flex; align-items: flex-start; gap: 10px; transition: background 0.15s ease;">
+                                <i class="fa-solid fa-location-dot" style="color: var(--brand); margin-top: 3px; font-size: 0.9rem; flex-shrink: 0;"></i>
+                                <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+                                    <span style="color: var(--text); font-weight: 600; line-height: 1.2;">${mainTitle}</span>
+                                    ${contextSubtitle ? `<span style="color: var(--muted); font-size: 0.76rem; line-height: 1.25;">${contextSubtitle}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    suggestionsBox.style.display = 'block';
+
+                    suggestionsBox.querySelectorAll('.location-suggestion-item').forEach(el => {
+                        el.addEventListener('mouseenter', () => { el.style.background = 'rgba(var(--brand-rgb, 12, 140, 233), 0.08)'; });
+                        el.addEventListener('mouseleave', () => { el.style.background = 'transparent'; });
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const val = el.dataset.val;
+                            addValue(val);
+                        });
+                    });
+                }
+            } catch (err) {
+                console.error("Location search error:", err);
+                if (suggestionsBox) suggestionsBox.style.display = 'none';
+            }
+        }, 350);
+
+        manualInput.addEventListener('input', (e) => searchLocation(e.target.value));
+
+        document.addEventListener('click', (e) => {
+            if (suggestionsBox && !manualInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
 
         // Re-assign chipsContainer as it was replaced
         const newChipsContainer = wrapper.querySelector('[data-ui$="-selected-chips"]');
@@ -5181,6 +5507,9 @@ const showRegistrationConfirmation = (data) => {
         }
         if (data.deliveryCoverage.cities && data.deliveryCoverage.cities.length > 0) {
             html += `<p><strong>Cities:</strong> ${data.deliveryCoverage.cities.join(', ')}</p>`;
+        }
+        if (data.deliveryCoverage.streets && data.deliveryCoverage.streets.length > 0) {
+            html += `<p><strong>Streets / Areas:</strong> ${data.deliveryCoverage.streets.join(', ')}</p>`;
         }
     }
     html += `</div>`;
