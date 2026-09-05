@@ -192,10 +192,22 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
     if (messageData.previewText) {
         lastMsgPreview = messageData.previewText;
     } else if (messageData.isEncrypted) {
-        lastMsgPreview = messageData.text;
-        lastMsgIv = messageData.iv !== undefined ? messageData.iv : null;
+        lastMsgPreview = messageData.text || '[Encrypted Message]';
+        lastMsgIv = messageData.iv !== undefined && messageData.iv !== null ? messageData.iv : null;
+    } else if (messageData.type === 'text' || messageData.type === 'system') {
+        lastMsgPreview = messageData.text || '';
+    } else if (messageData.type === 'audio') {
+        lastMsgPreview = '🎵 Voice Note';
+    } else if (messageData.type === 'image') {
+        lastMsgPreview = '📷 Image';
+    } else if (messageData.type === 'video') {
+        lastMsgPreview = '🎥 Video';
+    } else if (messageData.type === 'document') {
+        lastMsgPreview = `📄 ${messageData.fileName || 'Document'}`;
+    } else if (messageData.type === 'location') {
+        lastMsgPreview = '📍 Location';
     } else {
-        lastMsgPreview = (messageData.type === 'text' || messageData.type === 'system') ? messageData.text : `[${messageData.type}]`;
+        lastMsgPreview = `[${messageData.type || 'Message'}]`;
     }
 
     const participants = chatId.split('_');
@@ -212,12 +224,20 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
         }
     }
 
+    // Sanitize messageData to strip any undefined values that would cause Firebase set() to fail
+    const sanitizedMessageData = {};
+    for (const [k, v] of Object.entries(messageData)) {
+        if (v !== undefined) {
+            sanitizedMessageData[k] = v;
+        }
+    }
+
     await set(newMessageRef, {
-        ...messageData,
+        ...sanitizedMessageData,
         timestamp: timestamp,
         status: messageData.status || 'notified',
-        isEncrypted: messageData.isEncrypted !== undefined ? messageData.isEncrypted : null,
-        iv: messageData.iv !== undefined ? messageData.iv : null,
+        isEncrypted: messageData.isEncrypted !== undefined && messageData.isEncrypted !== null ? messageData.isEncrypted : null,
+        iv: messageData.iv !== undefined && messageData.iv !== null ? messageData.iv : null,
         chatId: messageData.chatId || chatId
     });
 
@@ -231,10 +251,10 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
                     const updates = {};
                     Object.keys(groupData.members).forEach(memberId => {
                         updates[`users/${memberId}/chatList/${chatId}/lastInteraction`] = timestamp;
-                        updates[`users/${memberId}/chatList/${chatId}/lastMessage`] = lastMsgPreview;
+                        updates[`users/${memberId}/chatList/${chatId}/lastMessage`] = lastMsgPreview || '';
                         updates[`users/${memberId}/chatList/${chatId}/lastMessageIsEncrypted`] = lastMsgEncryptedFlag;
                         updates[`users/${memberId}/chatList/${chatId}/lastMessageIv`] = lastMsgIv;
-                        updates[`users/${memberId}/chatList/${chatId}/lastSenderId`] = messageData.senderId;
+                        updates[`users/${memberId}/chatList/${chatId}/lastSenderId`] = messageData.senderId || null;
                         updates[`users/${memberId}/chatList/${chatId}/lastMessageType`] = messageData.type || 'text';
                         updates[`users/${memberId}/chatList/${chatId}/lastMessageFileName`] = messageData.fileName || null;
                         updates[`users/${memberId}/chatList/${chatId}/messageCount`] = increment(1);
@@ -254,10 +274,10 @@ export const saveMessage = async (chatId, messageData, preGeneratedId = null) =>
             { me: participants[1], other: participants[0] }
         ].forEach(pair => {
             updates[`users/${pair.me}/chatList/${pair.other}/lastInteraction`] = timestamp;
-            updates[`users/${pair.me}/chatList/${pair.other}/lastMessage`] = lastMsgPreview;
+            updates[`users/${pair.me}/chatList/${pair.other}/lastMessage`] = lastMsgPreview || '';
             updates[`users/${pair.me}/chatList/${pair.other}/lastMessageIsEncrypted`] = lastMsgEncryptedFlag;
             updates[`users/${pair.me}/chatList/${pair.other}/lastMessageIv`] = lastMsgIv;
-            updates[`users/${pair.me}/chatList/${pair.other}/lastSenderId`] = messageData.senderId;
+            updates[`users/${pair.me}/chatList/${pair.other}/lastSenderId`] = messageData.senderId || null;
             updates[`users/${pair.me}/chatList/${pair.other}/lastMessageType`] = messageData.type || 'text';
             updates[`users/${pair.me}/chatList/${pair.other}/lastMessageFileName`] = messageData.fileName || null;
             updates[`users/${pair.me}/chatList/${pair.other}/messageCount`] = increment(1);
@@ -1619,7 +1639,7 @@ export const getBusinessProfile = async (userId, { skipCache = false } = {}) => 
                     if (profile.theme) { 
                         let themeToApply = profile.theme;
                         if (themeToApply === 'system') {
-                            themeToApply = 'light';
+                            themeToApply = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
                         }
 
                         document.body.classList.remove('dark-theme', 'oled-theme');

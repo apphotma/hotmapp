@@ -106,8 +106,7 @@ export const initProfile = () => {
     const applyTheme = (theme) => {
         let finalTheme = theme;
         if (theme === 'system') {
-            // Treat system default as the app's default theme (light) on all devices.
-            finalTheme = 'light';
+            finalTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         }
 
         document.body.classList.remove('dark-theme', 'oled-theme');
@@ -144,8 +143,8 @@ export const initProfile = () => {
     const applyBubbleTheme = (settings) => {
         const sent = settings?.sentColor || DEFAULT_SENT_COLOR;
         const received = settings?.receivedColor || DEFAULT_RECEIVED_COLOR;
-        const sentText = settings?.sentTextColor || 'var(--text)';
-        const receivedText = settings?.receivedTextColor || 'var(--text)';
+        const sentText = settings?.sentTextColor || DEFAULT_SENT_TEXT_COLOR;
+        const receivedText = settings?.receivedTextColor || DEFAULT_RECEIVED_TEXT_COLOR;
 
         document.documentElement.style.setProperty('--wa-sent', sent);
         document.documentElement.style.setProperty('--wa-received', received);

@@ -282,6 +282,14 @@ export const initHistoryManager = () => {
                     return;
                 }
 
+                // Check if message selection mode is active
+                const selectionBar = document.querySelector('[data-ui="selection-bar"]') || document.querySelector('.selection-bar');
+                const isSelectionActive = selectionBar && selectionBar.classList.contains('active');
+                if (isSelectionActive) {
+                    window.dispatchEvent(new CustomEvent('hotmapp-cancel-selection'));
+                    return;
+                }
+
                 const chatsTab = document.querySelector('[data-ui="nav-chats"]');
                 const chatContainer = document.querySelector('[data-ui="chat-container"]') || document.querySelector('.chat-container');
                 const isViewingChat = chatContainer && chatContainer.classList.contains('viewing-chat');
@@ -335,6 +343,15 @@ export const initHistoryManager = () => {
             e.preventDefault();
             // Dispatch dedicated minimize event so call UI always handles it
             window.dispatchEvent(new CustomEvent('hotmapp-minimize-call'));
+            return;
+        }
+
+        // Check if message selection mode is active
+        const selectionBar = document.querySelector('[data-ui="selection-bar"]') || document.querySelector('.selection-bar');
+        const isSelectionActive = selectionBar && selectionBar.classList.contains('active');
+        if (isSelectionActive) {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('hotmapp-cancel-selection'));
             return;
         }
         

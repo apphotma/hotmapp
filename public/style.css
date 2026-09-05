@@ -31,26 +31,11 @@ body.dark-theme {
     --wa-received: rgb(143,241,239);
     --wa-sent-text: #111b21;
     --wa-received-text: #111b21;
+    background: var(--bg) !important;
+    color: var(--text);
 }
 
 /* OLED Theme (True Black) */
-body.oled-theme {
-    --bg: #000000;
-    --panel: #0a0a0a;
-    --panel-soft: #f0f2f5;
-    --text: #111b21;
-    --muted: #667781;
-    --brand: #00a884;
-    --header-bg: #075e54;
-    --brand-dark: #008069;
-    --border: #d1d7db;
-    --shadow: 0 2px 5px rgba(11, 20, 26, .08);
-    --wa-sent: rgb(81,255,124);
-    --wa-received: rgb(143,241,239);
-    --wa-sent-text: #111b21;
-    --wa-received-text: #111b21;
-}
-
 body.oled-theme {
     --bg: #000000;
     --panel: #0a0a0a;
@@ -61,7 +46,7 @@ body.oled-theme {
     --header-bg: #000000;
     /* True black header */
     --brand-dark: #008069;
-    --border: #2a3942;
+    --border: #222222;
     --shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     --wa-sent: rgb(81,255,124);
     /* Slightly darker green for OLED */
@@ -69,6 +54,8 @@ body.oled-theme {
     /* Very dark gray for received */
     --wa-sent-text: #111b21;
     --wa-received-text: #111b21;
+    background: #000000 !important;
+    color: var(--text);
 }
 
 * {
@@ -279,9 +266,10 @@ iframe {
     /* Position below the header */
     right: 16px;
     /* Align with the right edge of the header */
-    background: #ffffff;
+    background: var(--panel, #ffffff);
+    border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--border);
     z-index: 2000;
     min-width: 200px;
     padding: 8px 0;
@@ -292,7 +280,7 @@ iframe {
 }
 
 .header-dropdown-menu .context-menu-item:hover {
-    background: #f5f5f5;
+    background: var(--panel-soft);
 }
 
 .container {
@@ -316,13 +304,13 @@ iframe {
 }
 
 .chatsidebar {
-    background: white;
+    background: var(--panel);
     border-radius: 24px;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid #e6eee6;
+    border: 1px solid var(--border);
     min-width: 0;
     min-height: 0;
 }
@@ -436,13 +424,13 @@ iframe {
 }
 
 .costomersidebar {
-    background: white;
+    background: var(--panel);
     border-radius: 24px;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid #e6eee6;
+    border: 1px solid var(--border);
     display: none;
     min-width: 0;
     min-height: 0;
@@ -451,18 +439,18 @@ iframe {
 .search-box {
     padding: 18px 16px;
     border-bottom: 1px solid var(--border);
-    background: #f8faf7;
+    background: var(--panel-soft);
 }
 
 .search-input {
     width: 100%;
     border-radius: 999px;
-    border: 1px solid #dce3db;
+    border: 1px solid var(--border);
     padding: 12px 16px;
     outline: none;
     font-size: 0.95rem;
     color: var(--text);
-    background: white;
+    background: var(--panel);
 }
 
 .conversations-list {
@@ -489,7 +477,7 @@ iframe {
 
 .conversation-item:hover,
 .conversation-item.active {
-    background: #eff6ed;
+    background: var(--panel-soft);
 }
 
 .manage-customer-mobile-card {
@@ -703,9 +691,9 @@ iframe {
     position: relative;
     min-height: 0;
     /* Crucial for flexbox to calculate heights correctly */
-    background: white;
+    background: var(--panel);
     box-shadow: var(--shadow);
-    border: 1px solid #e5eee6;
+    border: 1px solid var(--border);
 }
 
 /* Selection Mode UI */
@@ -2178,12 +2166,12 @@ iframe {
     align-items: flex-end;
     /* Align icons to the bottom as text grows */
     flex: 1;
-    background: white;
+    background: var(--panel);
     border-radius: 8px;
     min-width: 0;
     /* Allow the input pill to shrink properly */
     padding: 5px 12px;
-    border: 1px solid white;
+    border: 1px solid var(--border);
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
 
@@ -3078,9 +3066,10 @@ iframe {
 /* Message Context Menu */
 .message-context-menu {
     position: fixed;
-    background: #ffffff;
+    background: var(--panel, #ffffff);
+    border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--border);
     z-index: 2000;
     min-width: 220px;
     padding: 8px 0;
@@ -3106,7 +3095,7 @@ iframe {
     display: flex;
     justify-content: space-around;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--panel-soft);
+    border-bottom: 1px solid var(--border);
     margin-bottom: 4px;
 }
 
@@ -3120,7 +3109,7 @@ iframe {
     transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
 }
 
-.reaction-btn:hover {
+.context-reaction-btn:hover {
     background: var(--panel-soft);
     transform: scale(1.2);
 }
@@ -3142,7 +3131,7 @@ iframe {
 }
 
 .context-menu-item:hover {
-    background: #f5f5f5;
+    background: var(--panel-soft);
 }
 
 .context-menu-item i {
@@ -4757,14 +4746,16 @@ iframe {
 }
 
 .modal-content {
-    background: white;
+    background: var(--panel, white);
+    color: var(--text);
     padding: 20px;
     border-radius: 16px;
     width: 95%;
     max-width: 450px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
 }
 
 .modal-header {
@@ -4777,7 +4768,7 @@ iframe {
 .modal-header h3 {
     margin: 0;
     font-size: 1.4rem;
-    color: #0f1111;
+    color: var(--text);
 }
 
 .close-modal {
@@ -4785,7 +4776,12 @@ iframe {
     border: none;
     font-size: 1.2rem;
     cursor: pointer;
-    color: #565959;
+    color: var(--muted);
+    transition: color 0.2s ease;
+}
+
+.close-modal:hover {
+    color: var(--text);
 }
 
 #add-product-form {
@@ -4801,20 +4797,20 @@ iframe {
 }
 
 .recent-search-chip {
-    background: #f0f2f5;
+    background: var(--panel-soft);
     padding: 6px 14px;
     border-radius: 16px;
     font-size: 0.8rem;
     color: var(--muted);
     cursor: pointer;
-    border: 1px solid #d1d7db;
+    border: 1px solid var(--border);
     transition: all 0.2s;
 }
 
 .recent-search-chip:hover {
-    background: #e9edef;
+    background: var(--panel);
     color: var(--text);
-    border-color: #aebac1;
+    border-color: var(--brand);
 }
 
 #qr-reader video {
@@ -4831,24 +4827,27 @@ iframe {
 .form-group label {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #232f30;
+    color: var(--text);
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
     padding: 10px 12px;
-    border: 1px solid #d5d9d9;
+    border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.95rem;
     outline: none;
     transition: border-color 0.2s;
+    background: var(--panel-soft);
+    color: var(--text);
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
-    border-color: #e77600;
-    box-shadow: 0 0 3px 2px rgba(228, 121, 17, .5);
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
 }
 
 .form-row {
@@ -4953,13 +4952,18 @@ iframe {
 }
 
 .cancel-delete-btn {
-    background: #f0f2f2;
-    color: #0f1111;
-    border: 1px solid #d5d9d9;
+    background: var(--panel-soft);
+    color: var(--text);
+    border: 1px solid var(--border);
     padding: 10px 24px;
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cancel-delete-btn:hover {
+    background: var(--panel);
 }
 
 /* Settings Modal Specifics */
@@ -4998,6 +5002,21 @@ iframe {
     width: 25px;
     /* Fixed width for icons */
     text-align: center;
+}
+
+/* Theme Selection Modal Item styling */
+.theme-options-list .settings-menu-item {
+    background: var(--panel-soft);
+    color: var(--text);
+    border: 1px solid var(--border) !important;
+}
+
+.theme-options-list .settings-menu-item:hover {
+    background: var(--panel);
+}
+
+.theme-options-list .settings-menu-item span {
+    color: var(--text);
 }
 
 .product-uploads-container {
@@ -5271,14 +5290,16 @@ iframe {
 }
 
 .auth-card {
-    background: white;
+    background: var(--panel, white);
+    color: var(--text);
     width: 100%;
     max-width: 420px;
     padding: 40px;
     border-radius: 28px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--border);
 }
 
 .auth-header {
@@ -8829,7 +8850,6 @@ body.dark-theme .link-qr-wrapper {
     height: 12px;
     border-radius: 50%;
     background: #00a884;
-    /* WhatsApp green */
     cursor: pointer;
     border: none;
     transition: transform 0.1s;
@@ -8846,6 +8866,95 @@ body.dark-theme .link-qr-wrapper {
     background: #00a884;
     cursor: pointer;
     border: none;
+}
+
+/* WhatsApp Waveform Amplitude Bars styling */
+.wa-waveform-container {
+    position: relative;
+    width: 100%;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    padding: 2px 0;
+}
+
+.wa-waveform-track {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+}
+
+.wa-waveform-bar {
+    flex: 1;
+    min-width: 2px;
+    max-width: 4px;
+    min-height: 4px;
+    border-radius: 2px;
+    background-color: #b0bec5;
+    transition: background-color 0.1s ease, height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Unplayed bars based on message bubble context */
+.message-group.sent .wa-waveform-bar {
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+.message-group:not(.sent) .wa-waveform-bar {
+    background-color: #c1c7cb;
+}
+
+/* Played bars: WhatsApp Green */
+.wa-waveform-bar.played,
+.message-group.sent .wa-waveform-bar.played,
+.message-group:not(.sent) .wa-waveform-bar.played {
+    background-color: #00a884 !important;
+}
+
+/* Dark mode / OLED mode styling */
+.dark-theme .message-group.sent .wa-waveform-bar,
+.oled-theme .message-group.sent .wa-waveform-bar {
+    background-color: rgba(255, 255, 255, 0.28);
+}
+
+.dark-theme .message-group:not(.sent) .wa-waveform-bar,
+.oled-theme .message-group:not(.sent) .wa-waveform-bar {
+    background-color: #4a5d68;
+}
+
+.dark-theme .wa-waveform-bar.played,
+.oled-theme .wa-waveform-bar.played,
+.dark-theme .message-group.sent .wa-waveform-bar.played,
+.oled-theme .message-group.sent .wa-waveform-bar.played,
+.dark-theme .message-group:not(.sent) .wa-waveform-bar.played,
+.oled-theme .message-group:not(.sent) .wa-waveform-bar.played {
+    background-color: #00a884 !important;
+}
+
+/* Gliding playhead scrubber dot */
+.wa-waveform-scrubber-dot {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: #00a884;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.08s ease, left 0.05s linear;
+    z-index: 2;
+}
+
+.wa-waveform-container:hover .wa-waveform-scrubber-dot,
+.wa-waveform-container:active .wa-waveform-scrubber-dot {
+    transform: translate(-50%, -50%) scale(1.25);
 }
 
 .wa-player-meta {

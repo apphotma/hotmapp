@@ -795,14 +795,18 @@ const setupLightboxUI = (msg, url, isProfilePhoto) => {
                     console.warn('Failed to decrypt lightbox message for forward preview', e);
                 }
 
-                pendingForwardData = [{
-                    text: (msg.isDecrypted ? msg.text : (msg.previewText || msg.text)) || '',
-                    previewText: msg.previewText || (msg.isDecrypted ? msg.text : undefined),
-                    type: msg.type,
+                const msgType = msg.type || 'image';
+                const forwardItem = {
+                    type: msgType,
                     url: msg.url || null,
-                    fileName: msg.fileName || null,
-                    fileSize: msg.fileSize || null
-                }];
+                    thumbnailUrl: msg.thumbnailUrl || msg.url || null,
+                    fileName: msg.fileName || (msgType === 'video' ? 'video.mp4' : 'image.jpg'),
+                    fileSize: msg.fileSize || null,
+                    previewText: msgType === 'video' ? '🎥 Video' : '📷 Image'
+                };
+                if (msg.duration) forwardItem.duration = msg.duration;
+
+                pendingForwardData = [forwardItem];
                 selectedForwardRecipients.clear();
                 updateForwardButton();
 
@@ -1138,6 +1142,36 @@ let selectionMap = null;
 let selectionMarker = null;
 export let activeChatUid = null; // Track the UID of the user we are currently chatting with
 export const getActiveChatUid = () => activeChatUid;
+export const getCurrentChatId = () => {
+    const user = auth?.currentUser;
+    if (!user || !activeChatUid) return null;
+    return activeChatUid.startsWith('group_') ? activeChatUid : [user.uid, activeChatUid].sort().join('_');
+};
+const activeMediaUploads = new Map(); // Track in-flight uploads: msgId -> { id, chatId, placeholderMessage, progress }
+let hideVoicePreviewFn = null; // Global module reference to cancel/hide voice recording preview
+
+let currentActiveMedia = null; // Track currently playing media: { media, pause: () => void }
+
+export const stopAllActiveMedia = (exceptMedia = null) => {
+    if (currentActiveMedia && currentActiveMedia !== exceptMedia) {
+        try {
+            if (typeof currentActiveMedia.pause === 'function') {
+                currentActiveMedia.pause();
+            }
+        } catch (e) {
+            console.warn('Error pausing active media:', e);
+        }
+        currentActiveMedia = null;
+    }
+};
+
+export const registerActiveMedia = (mediaController) => {
+    if (!mediaController) return;
+    if (currentActiveMedia && currentActiveMedia !== mediaController) {
+        stopAllActiveMedia(mediaController);
+    }
+    currentActiveMedia = mediaController;
+};
 let isCurrentlyTypingInDb = false;
 let pendingForwardData = []; // Buffer to store message data being forwarded
 let incomingShareIntent = null; // Buffer to hold share intents received before authentication
@@ -1416,6 +1450,7 @@ const stopSynthesizedRingback = () => {
 
 const playRingAudio = (type) => {
     stopRingAudio();
+    stopAllActiveMedia();
     if (type === 'outgoing') {
         playSynthesizedRingback();
     } else {
@@ -2151,9 +2186,8 @@ const populateForwardUserList = async () => {
             if (pendingForwardData && pendingForwardData.length > 0) {
                 previewContainer.style.display = 'block';
                 previewContainer.innerHTML = pendingForwardData.map(item => {
-                    const isEncrypted = item.isEncrypted;
                     const isPending = item.status === 'pending' || (item.id && item.id.startsWith && item.id.startsWith('pending_'));
-                    const text = item.previewText || item.text || (item.type === 'image' ? '📷 Image' : (item.type === 'document' ? '📄 File' : `[${item.type}]`));
+                    const text = item.previewText || item.text || (item.type === 'image' ? '📷 Image' : (item.type === 'video' ? '🎥 Video' : (item.type === 'audio' ? '🎵 Voice Note' : (item.type === 'document' ? `📄 ${item.fileName || 'Document'}` : (item.type === 'location' ? '📍 Location' : `[${item.type || 'Message'}]`)))));
                     const pendingIcon = isPending ? ' <span style="margin-left:6px; opacity:0.8; font-size:0.9em;">⏳</span>' : '';
                     return `<div class="forward-preview-item" style="padding:6px 0; border-bottom:1px dashed var(--border); font-size:0.92rem;">${text}${pendingIcon}</div>`;
                 }).join('');
@@ -2221,28 +2255,63 @@ const handleMassForward = async () => {
     if (selectedMessages.size === 0) return;
 
     // Capture the actual message data immediately to prevent data loss if the chat context changes
-    // Ensure encrypted messages are decrypted (if possible) before capturing the text to forward.
     pendingForwardData = [];
     for (const id of Array.from(selectedMessages)) {
         const msg = messages.find(m => m.id === id);
         if (!msg) continue;
         try {
             if (msg.isEncrypted && !msg.isDecrypted) {
-                // attempt decryption for forwarding preview (don't persist to cache here)
+                // attempt decryption for forwarding preview
                 await decryptMessageInPlace(msg, { cache: false });
             }
         } catch (e) {
             console.warn('Failed to decrypt message for forwarding preview', e);
         }
 
-        // Strip metadata that shouldn't be cloned to a new room
-        const { id: _, timestamp: __, status: ___, isStarred: ____, starredAt: _____, ...rest } = msg;
-        // prefer previewText if present, otherwise prefer decrypted text when available
-        const cleanData = {
-            ...rest,
-            previewText: rest.previewText || (rest.isDecrypted ? rest.text : undefined)
-        };
-        pendingForwardData.push(cleanData);
+        const type = msg.type || 'text';
+        let itemData = { type };
+
+        if (type === 'image') {
+            itemData.url = msg.url || null;
+            itemData.thumbnailUrl = msg.thumbnailUrl || msg.url || null;
+            itemData.fileName = msg.fileName || 'image.jpg';
+            itemData.fileSize = msg.fileSize || null;
+            itemData.previewText = '📷 Image';
+        } else if (type === 'audio') {
+            itemData.url = msg.url || null;
+            itemData.fileName = msg.fileName || 'voice_note.mp3';
+            itemData.fileSize = msg.fileSize || null;
+            itemData.duration = msg.duration || null;
+            itemData.previewText = '🎵 Voice Note';
+        } else if (type === 'video') {
+            itemData.url = msg.url || null;
+            itemData.thumbnailUrl = msg.thumbnailUrl || null;
+            itemData.fileName = msg.fileName || 'video.mp4';
+            itemData.fileSize = msg.fileSize || null;
+            itemData.duration = msg.duration || null;
+            itemData.previewText = '🎥 Video';
+        } else if (type === 'document') {
+            itemData.url = msg.url || null;
+            itemData.thumbnailUrl = msg.thumbnailUrl || null;
+            itemData.fileName = msg.fileName || 'document';
+            itemData.fileSize = msg.fileSize || null;
+            itemData.previewText = `📄 ${msg.fileName || 'Document'}`;
+        } else if (type === 'location' || type === 'live-location') {
+            itemData.type = 'location';
+            itemData.latitude = msg.latitude || null;
+            itemData.longitude = msg.longitude || null;
+            itemData.address = msg.address || '';
+            itemData.mapUrl = msg.mapUrl || (msg.latitude && msg.longitude ? `https://www.google.com/maps?q=${msg.latitude},${msg.longitude}` : '');
+            itemData.staticMapUrl = msg.staticMapUrl || '';
+            itemData.previewText = '📍 Location';
+        } else {
+            const plainText = msg.isDecrypted ? msg.text : (msg.text || '');
+            itemData.type = 'text';
+            itemData.text = plainText;
+            itemData.previewText = plainText;
+        }
+
+        pendingForwardData.push(itemData);
     }
 
     if (pendingForwardData.length === 0) return;
@@ -2276,21 +2345,46 @@ const toggleSelectMode = (active, options = {}) => {
 
 const executeForward = async (targetUid, messagesToForward) => {
     const currentUser = auth.currentUser;
+    if (!currentUser) return;
     const chatId = targetUid.startsWith('group_') ? targetUid : [currentUser.uid, targetUid].sort().join('_');
+    const isGroup = chatId.startsWith('group_');
 
-    const forwardPromises = messagesToForward.map(async (data) => {
-        let messageData = {
-            ...data,
+    const forwardPromises = messagesToForward.map(async (rawItem) => {
+        const item = { ...rawItem };
+        const type = item.type || 'text';
+
+        let previewText = item.previewText;
+        if (!previewText) {
+            if (type === 'image') previewText = '📷 Image';
+            else if (type === 'video') previewText = '🎥 Video';
+            else if (type === 'audio') previewText = '🎵 Voice Note';
+            else if (type === 'document') previewText = `📄 ${item.fileName || 'Document'}`;
+            else if (type === 'location') previewText = '📍 Location';
+            else previewText = item.text || '';
+        }
+
+        const messageData = {
             senderId: currentUser.uid,
             chatId: chatId,
-            forwarded: true
+            type: type,
+            forwarded: true,
+            status: isGroup ? 'notified' : 'sent',
+            previewText: previewText,
+            isEncrypted: null,
+            iv: null
         };
-        delete messageData.id;
-        delete messageData.timestamp;
-        delete messageData.status;
 
-        messageData.isEncrypted = null;
-        messageData.iv = null;
+        if (item.text !== undefined && item.text !== null) messageData.text = item.text;
+        if (item.url !== undefined && item.url !== null) messageData.url = item.url;
+        if (item.thumbnailUrl !== undefined && item.thumbnailUrl !== null) messageData.thumbnailUrl = item.thumbnailUrl;
+        if (item.fileName !== undefined && item.fileName !== null) messageData.fileName = item.fileName;
+        if (item.fileSize !== undefined && item.fileSize !== null) messageData.fileSize = item.fileSize;
+        if (item.duration !== undefined && item.duration !== null) messageData.duration = item.duration;
+        if (item.latitude !== undefined && item.latitude !== null) messageData.latitude = item.latitude;
+        if (item.longitude !== undefined && item.longitude !== null) messageData.longitude = item.longitude;
+        if (item.address !== undefined && item.address !== null) messageData.address = item.address;
+        if (item.mapUrl !== undefined && item.mapUrl !== null) messageData.mapUrl = item.mapUrl;
+        if (item.staticMapUrl !== undefined && item.staticMapUrl !== null) messageData.staticMapUrl = item.staticMapUrl;
 
         return saveMessage(chatId, messageData);
     });
@@ -2756,37 +2850,26 @@ const processMediaUpload = async (item) => {
         const storagePath = `chat_media/${chatId}/${Date.now()}_${auth.currentUser.uid}.${extension}`;
 
         const uploadTask = uploadFile(storagePath, uploadTarget, (progress) => {
-            try {
-                const msgEl = document.getElementById(id);
-                if (msgEl) {
-                    const progressText = msgEl.querySelector('.inline-progress-text');
-                    if (progressText) progressText.textContent = `${Math.round(progress)}%`;
-                    const docProgressText = msgEl.querySelector('.class-doc-progress');
-                    if (docProgressText) docProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
-                    const audioProgressText = msgEl.querySelector('.class-audio-progress');
-                    if (audioProgressText) audioProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
-                }
-            } catch (e) { }
+            const uploadEntry = activeMediaUploads.get(id);
+            if (uploadEntry) uploadEntry.progress = progress;
+
+            // Only update DOM progress indicators if the user is currently viewing the chat
+            if (getCurrentChatId() === chatId) {
+                try {
+                    const msgEl = document.getElementById(id);
+                    if (msgEl) {
+                        const progressText = msgEl.querySelector('.inline-progress-text');
+                        if (progressText) progressText.textContent = `${Math.round(progress)}%`;
+                        const docProgressText = msgEl.querySelector('.class-doc-progress');
+                        if (docProgressText) docProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+                        const audioProgressText = msgEl.querySelector('.class-audio-progress');
+                        if (audioProgressText) audioProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+                    }
+                } catch (e) { }
+            }
         });
 
         const downloadURL = await uploadTask;
-
-        // Update optimistic placeholder immediately with the real URL
-        try {
-            const updatedLocal = {
-                id,
-                senderId: auth.currentUser.uid,
-                chatId: chatId,
-                type: type,
-                url: downloadURL,
-                thumbnailUrl: thumbnailUrl || (type === 'image' ? downloadURL : null),
-                fileName: fileName || `media_${Date.now()}`,
-                timestamp: clientTimestamp,
-                status: 'sending',
-                fileSize: fileOrBlob.size
-            };
-            displayMessage(updatedLocal, false);
-        } catch (e) { console.warn('Failed to update placeholder with URL', e); }
 
         // Save metadata and downloadURL to DB
         const messageData = {
@@ -2802,31 +2885,46 @@ const processMediaUpload = async (item) => {
             status: chatId.startsWith('group_') ? 'notified' : 'sent'
         };
         if (videoDuration) messageData.duration = videoDuration;
+        if (item.waveform) messageData.waveform = item.waveform;
 
         await saveMessage(chatId, messageData, id);
+
+        const finalLocal = { ...messageData, id };
+        await cacheItem('messages', finalLocal);
+
+        // Only update UI if user is currently viewing the target chat
+        if (getCurrentChatId() === chatId) {
+            try {
+                displayMessage(finalLocal, false);
+            } catch (e) { console.warn('Failed to display uploaded media message', e); }
+        }
     } catch (error) {
         console.error("Media Upload Error:", error);
         showToast("Failed to upload media. Please try again.", "error");
-        try {
-            displayMessage({ id, senderId: auth.currentUser.uid, status: 'failed' }, false);
-            const msgEl = document.getElementById(id);
-            if (msgEl) msgEl.classList.add('message-send-failed');
-        } catch (e) { }
+        if (getCurrentChatId() === chatId) {
+            try {
+                displayMessage({ id, senderId: auth.currentUser.uid, status: 'failed', chatId }, false);
+                const msgEl = document.getElementById(id);
+                if (msgEl) msgEl.classList.add('message-send-failed');
+            } catch (e) { }
+        }
     } finally {
+        activeMediaUploads.delete(id);
         if (previewUrl) URL.revokeObjectURL(previewUrl);
     }
 };
 
-const sendMedia = async (type, fileOrBlob, fileName = null) => {
+const sendMedia = async (type, fileOrBlob, fileName = null, targetChatUid = null, waveform = null) => {
     const user = auth.currentUser;
-    if (!user || !activeChatUid || !fileOrBlob || !elements.chatArea) return;
+    const effectiveChatUid = targetChatUid || activeChatUid;
+    if (!user || !effectiveChatUid || !fileOrBlob || !elements.chatArea) return;
 
     if (fileOrBlob.size > MAX_FILE_SIZE) {
         showToast(`File too large! Max size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`, "error");
         return;
     }
 
-    const chatId = activeChatUid.startsWith('group_') ? activeChatUid : [user.uid, activeChatUid].sort().join('_');
+    const chatId = effectiveChatUid.startsWith('group_') ? effectiveChatUid : [user.uid, effectiveChatUid].sort().join('_');
     const messagesRef = ref(db, `messages/${chatId}`);
     const preGeneratedId = push(messagesRef).key;
     const clientTimestamp = Date.now();
@@ -2873,14 +2971,24 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
         status: 'sending',
         fileSize: fileOrBlob.size,
         isEncrypted: null,
+        waveform: waveform || (type === 'audio' ? generateFallbackWaveform(preGeneratedId, 34) : null),
         previewText: type === 'image' ? '📷 Image' : (type === 'video' ? '🎥 Video' : (type === 'audio' ? '🎵 Audio' : `📄 ${fileName || 'Document'}`))
     };
 
-    // Immediately render the placeholder in the messages container
-    try {
-        displayMessage(placeholderMessage, false);
-    } catch (e) {
-        console.warn('Could not render optimistic placeholder message', e);
+    activeMediaUploads.set(preGeneratedId, {
+        id: preGeneratedId,
+        chatId,
+        placeholderMessage,
+        progress: 0
+    });
+
+    // Immediately render the placeholder if user is viewing this chat
+    if (getCurrentChatId() === chatId) {
+        try {
+            displayMessage(placeholderMessage, false);
+        } catch (e) {
+            console.warn('Could not render optimistic placeholder message', e);
+        }
     }
 
     const item = {
@@ -2893,7 +3001,8 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
         replyingTo: replyData,
         uploadTarget,
         videoDuration,
-        previewUrl
+        previewUrl,
+        waveform: placeholderMessage.waveform
     };
 
     if (!(await isOnline())) {
@@ -2906,13 +3015,16 @@ const sendMedia = async (type, fileOrBlob, fileName = null) => {
     }
 
     hideReplyPreview();
-    if (elements.messagesContainer) elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+    if (getCurrentChatId() === chatId && elements.messagesContainer) {
+        elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+    }
 };
 
 // Initialize Voice Recording logic
-// Initialize Voice Recording logic
 const initVoiceRecording = () => {
     let lastBlob = null;
+    let lastWaveform = null;
+    let recordingChatUid = null;
     let isRecordingActive = false;
     let isLocked = false;
     let isStoppedForPreview = false;
@@ -2927,8 +3039,12 @@ const initVoiceRecording = () => {
         if (isRecordingActive) return;
 
         try {
+            stopAllActiveMedia();
             // Prevent default touch/click behaviors to avoid text selection or scrolling
             if (e && e.cancelable) e.preventDefault();
+
+            // Bind to the currently active conversation when recording begins
+            recordingChatUid = activeChatUid;
 
             // Set coordinates for gesture tracking
             const pageX = e.touches ? e.touches[0].pageX : e.clientX;
@@ -2947,15 +3063,23 @@ const initVoiceRecording = () => {
             audioChunks = [];
 
             mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
-            mediaRecorder.onstop = () => {
+            mediaRecorder.onstop = async () => {
                 lastBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
                 audioUrl = URL.createObjectURL(lastBlob);
 
                 // If it was cancelled, discard the blob
                 if (isCancelled) {
                     lastBlob = null;
+                    lastWaveform = null;
                     audioUrl = null;
                     return;
+                }
+
+                // Extract real amplitude waveform
+                try {
+                    lastWaveform = await extractWaveformFromBlob(lastBlob, 34);
+                } catch (e) {
+                    lastWaveform = generateFallbackWaveform(String(Date.now()), 34);
                 }
 
                 // If it was locked, show preview/locked UI
@@ -3141,15 +3265,21 @@ const initVoiceRecording = () => {
         if (elements.voicePreview) elements.voicePreview.style.display = 'none';
         audioUrl = null;
         lastBlob = null;
+        lastWaveform = null;
+        recordingChatUid = null;
         isStoppedForPreview = false;
     };
 
+    hideVoicePreviewFn = hideVoicePreview;
+
     const sendVoiceNote = async () => {
         const voiceBlob = lastBlob;
-        if (!voiceBlob) return;
+        const targetUid = recordingChatUid || activeChatUid;
+        const waveform = lastWaveform;
+        if (!voiceBlob || !targetUid) return;
 
         hideVoicePreview();
-        await sendMedia('audio', voiceBlob, `voice_note_${Date.now()}.mp3`);
+        await sendMedia('audio', voiceBlob, `voice_note_${Date.now()}.mp3`, targetUid, waveform);
     };
 
     // Event Listeners for Mic Button (Touch and Mouse gestures)
@@ -3168,13 +3298,29 @@ const initVoiceRecording = () => {
                 previewAudio.pause();
                 elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
             } else {
+                stopAllActiveMedia();
                 if (!previewAudio) {
                     previewAudio = new Audio(audioUrl);
                     previewAudio.onended = () => {
-                        elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                        if (elements.previewPlayBtn) elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                    };
+                    previewAudio.onpause = () => {
+                        if (elements.previewPlayBtn) elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
                     };
                 }
-                previewAudio.play();
+                const previewController = {
+                    media: previewAudio,
+                    pause: () => {
+                        if (previewAudio && !previewAudio.paused) {
+                            previewAudio.pause();
+                        }
+                        if (elements.previewPlayBtn) {
+                            elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                        }
+                    }
+                };
+                registerActiveMedia(previewController);
+                previewAudio.play().catch(err => console.warn("Preview audio playback failed:", err));
                 elements.previewPlayBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
             }
         }
@@ -3183,11 +3329,18 @@ const initVoiceRecording = () => {
     elements.previewCancelBtn?.addEventListener('click', hideVoicePreview);
 
     elements.previewSendBtn?.addEventListener('click', async () => {
+        const targetUid = recordingChatUid || activeChatUid;
         if (mediaRecorder && mediaRecorder.state === "recording") {
             // Stop recorder first to trigger save message
             mediaRecorder.onstop = async () => {
                 const finalBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
-                await sendMedia('audio', finalBlob, `voice_note_${Date.now()}.mp3`);
+                let waveform = null;
+                try {
+                    waveform = await extractWaveformFromBlob(finalBlob, 34);
+                } catch (e) {
+                    waveform = generateFallbackWaveform(String(Date.now()), 34);
+                }
+                await sendMedia('audio', finalBlob, `voice_note_${Date.now()}.mp3`, targetUid, waveform);
                 hideVoicePreview();
             };
             stopRecording();
@@ -6146,6 +6299,138 @@ const hideEditPreview = () => {
     toggleInputButtons();
 };
 
+// WhatsApp-style Audio Waveform Generation and Extraction
+export const generateFallbackWaveform = (seedStr = '', count = 34) => {
+    let seed = 42;
+    for (let i = 0; i < (seedStr || '').length; i++) {
+        seed = (seed * 31 + seedStr.charCodeAt(i)) % 10000;
+    }
+    const waveform = [];
+    for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const envelope = Math.sin(t * Math.PI);
+        const rand = Math.sin(seed + i * 1.618) * 0.5 + 0.5;
+        const voiceAccent = (i % 3 === 0) ? 0.3 : 0;
+        const val = 0.18 + 0.72 * (envelope * 0.45 + rand * 0.35 + voiceAccent * 0.2);
+        waveform.push(Number(Math.max(0.15, Math.min(1.0, val)).toFixed(2)));
+    }
+    return waveform;
+};
+
+export const extractWaveformFromBlob = async (blob, count = 34) => {
+    if (!blob) return generateFallbackWaveform('', count);
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const AudioContextClass = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+        if (!AudioContextClass) return generateFallbackWaveform(String(blob.size || ''), count);
+        const audioCtx = new AudioContextClass();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const channelData = audioBuffer.getChannelData(0);
+        const blockSize = Math.floor(channelData.length / count);
+        const waveform = [];
+
+        for (let i = 0; i < count; i++) {
+            const start = i * blockSize;
+            let sum = 0;
+            const end = Math.min(channelData.length, start + blockSize);
+            const step = Math.max(1, Math.floor((end - start) / 40));
+            let sampled = 0;
+            for (let j = start; j < end; j += step) {
+                sum += Math.abs(channelData[j]);
+                sampled++;
+            }
+            const avg = sampled > 0 ? sum / sampled : 0;
+            const boosted = Math.sqrt(avg) * 1.9;
+            const normalized = Math.max(0.15, Math.min(1.0, boosted));
+            waveform.push(Number(normalized.toFixed(2)));
+        }
+        audioCtx.close().catch(() => {});
+        return waveform;
+    } catch (e) {
+        console.warn("AudioContext decode for waveform fallback:", e);
+        return generateFallbackWaveform(String(blob.size || ''), count);
+    }
+};
+
+export const renderWaveformBarsHtml = (waveform, barCount = 34) => {
+    const data = (Array.isArray(waveform) && waveform.length > 0)
+        ? waveform
+        : generateFallbackWaveform('', barCount);
+
+    return data.slice(0, barCount).map((val) => {
+        const heightPx = Math.max(4, Math.min(24, Math.round(val * 24)));
+        return `<span class="wa-waveform-bar" style="height: ${heightPx}px;" data-level="${val}"></span>`;
+    }).join('');
+};
+
+// WhatsApp-style subtle voice note transition chime
+export const playVoiceNoteTransitionChime = () => {
+    try {
+        const AudioContextClass = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        const now = ctx.currentTime;
+        // WhatsApp subtle two-tone chime: 600Hz -> 880Hz
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.16);
+        setTimeout(() => ctx.close().catch(() => {}), 200);
+    } catch (e) {
+        // Silent fallback
+    }
+};
+
+// Check if the very next chronological message in the chat is a voice note
+export const getNextConsecutiveVoiceNoteId = (currentMsgId, messageList = messages) => {
+    if (!currentMsgId) return null;
+
+    // 1. Check in active message list
+    if (Array.isArray(messageList) && messageList.length > 0) {
+        const idx = messageList.findIndex(m => m.id === currentMsgId);
+        if (idx !== -1) {
+            if (idx >= messageList.length - 1) return null;
+            const nextMsg = messageList[idx + 1];
+            if (nextMsg && !nextMsg.deleted && nextMsg.type === 'audio') {
+                return nextMsg.id;
+            }
+            // Intercepted by another message type (text, image, video, doc, etc.)
+            return null;
+        }
+    }
+
+    // 2. Fallback check via DOM siblings in messagesContainer
+    if (typeof document !== 'undefined') {
+        const currentEl = document.getElementById(currentMsgId);
+        if (currentEl) {
+            let nextEl = currentEl.nextElementSibling;
+            // Skip non-message elements like ephemeral banners or date dividers
+            while (nextEl && !nextEl.classList.contains('message-group')) {
+                nextEl = nextEl.nextElementSibling;
+            }
+            if (nextEl && nextEl.classList.contains('message-group')) {
+                const nextAudioPlayer = nextEl.querySelector('.wa-audio-player');
+                if (nextAudioPlayer && !nextEl.classList.contains('message-deleted')) {
+                    return nextEl.id;
+                }
+            }
+        }
+    }
+
+    return null;
+};
+
 // Initialize a WhatsApp-style custom audio player
 const initCustomAudioPlayer = async (messageId, audioUrl) => {
     const groupEl = document.getElementById(messageId);
@@ -6154,86 +6439,200 @@ const initCustomAudioPlayer = async (messageId, audioUrl) => {
     const playerEl = groupEl.querySelector('.wa-audio-player');
     if (!playerEl) return;
 
+    // Prevent duplicate listener registration if already initialized
+    if (playerEl.audioInstance) return;
+
     const playBtn = playerEl.querySelector('.wa-play-btn');
-    const slider = playerEl.querySelector('.wa-progress-slider');
+    const waveformContainer = playerEl.querySelector('.wa-waveform-container');
+    const waveformTrack = playerEl.querySelector('.wa-waveform-track');
+    const scrubberDot = playerEl.querySelector('.wa-waveform-scrubber-dot');
     const durationText = playerEl.querySelector('.wa-duration');
     const speedBtn = playerEl.querySelector('.wa-speed-btn');
 
     const resolvedUrl = await getOrFetchMediaBlobUrl(audioUrl);
     const audio = new Audio(resolvedUrl);
     let speed = 1.0;
-    let previewAudio = null; // Local speed cache
+    let isDragging = false;
+
+    // If real waveform is not yet rendered or was fallback, decode in background to update bar heights accurately
+    const msg = messages.find(m => m.id === messageId);
+    if ((!msg?.waveform || msg.waveform.length < 10) && waveformTrack) {
+        (async () => {
+            try {
+                const resp = await fetch(resolvedUrl);
+                const blob = await resp.blob();
+                const realWaveform = await extractWaveformFromBlob(blob, 34);
+                if (realWaveform && realWaveform.length > 0) {
+                    if (msg) msg.waveform = realWaveform;
+                    const bars = waveformTrack.querySelectorAll('.wa-waveform-bar');
+                    bars.forEach((bar, idx) => {
+                        if (realWaveform[idx] !== undefined) {
+                            const h = Math.max(4, Math.min(24, Math.round(realWaveform[idx] * 24)));
+                            bar.style.height = `${h}px`;
+                            bar.dataset.level = realWaveform[idx];
+                        }
+                    });
+                }
+            } catch (e) { }
+        })();
+    }
+
+    const updateWaveformProgress = (pct) => {
+        if (!waveformTrack) return;
+        const bars = waveformTrack.querySelectorAll('.wa-waveform-bar');
+        const count = bars.length;
+        const playedCount = Math.round((pct / 100) * count);
+
+        bars.forEach((bar, idx) => {
+            if (idx < playedCount) {
+                bar.classList.add('played');
+            } else {
+                bar.classList.remove('played');
+            }
+        });
+
+        if (scrubberDot) {
+            scrubberDot.style.left = `${pct}%`;
+        }
+    };
+
+    const controller = {
+        media: audio,
+        pause: () => {
+            if (!audio.paused) {
+                audio.pause();
+            }
+            if (playBtn) {
+                playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+            }
+        }
+    };
 
     // Set meta duration once loaded
     audio.addEventListener('loadedmetadata', () => {
         const mins = Math.floor(audio.duration / 60);
         const secs = Math.floor(audio.duration % 60);
-        durationText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        if (durationText) durationText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     });
 
     // Fallback if metadata is already loaded
     if (audio.duration && !isNaN(audio.duration)) {
         const mins = Math.floor(audio.duration / 60);
         const secs = Math.floor(audio.duration % 60);
-        durationText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        if (durationText) durationText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
+    // Play/Pause state events
+    audio.addEventListener('play', () => {
+        registerActiveMedia(controller);
+        if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+    });
+
+    audio.addEventListener('pause', () => {
+        if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+    });
+
     // Play/Pause interaction
-    playBtn.addEventListener('click', (e) => {
+    playBtn?.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent message bubble actions
 
-        // Stop all other audio players in chat first
-        document.querySelectorAll('.wa-audio-player').forEach(otherPlayer => {
-            if (otherPlayer !== playerEl && otherPlayer.audioInstance && !otherPlayer.audioInstance.paused) {
-                otherPlayer.audioInstance.pause();
-                const otherPlayBtn = otherPlayer.querySelector('.wa-play-btn');
-                if (otherPlayBtn) otherPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
-            }
-        });
-
         if (audio.paused) {
+            stopAllActiveMedia(controller);
+            registerActiveMedia(controller);
             audio.play().catch(err => console.error("Audio playback blocked:", err));
-            playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
         } else {
             audio.pause();
-            playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
         }
     });
 
-    // Update progress slider
+    // Update progress on timeupdate
     audio.addEventListener('timeupdate', () => {
-        if (!audio.duration || isNaN(audio.duration)) return;
+        if (!audio.duration || isNaN(audio.duration) || isDragging) return;
         const pct = (audio.currentTime / audio.duration) * 100;
-        slider.value = pct;
+        updateWaveformProgress(pct);
 
-        // Update timer
         const currentMins = Math.floor(audio.currentTime / 60);
         const currentSecs = Math.floor(audio.currentTime % 60);
-
         const totalMins = Math.floor(audio.duration / 60);
         const totalSecs = Math.floor(audio.duration % 60);
 
-        durationText.textContent = `${currentMins}:${currentSecs.toString().padStart(2, '0')} / ${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+        if (durationText) {
+            durationText.textContent = `${currentMins}:${currentSecs.toString().padStart(2, '0')} / ${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+        }
     });
 
-    // Drag slider to seek
-    slider.addEventListener('input', () => {
-        if (!audio.duration || isNaN(audio.duration)) return;
-        const time = (slider.value / 100) * audio.duration;
-        audio.currentTime = time;
-    });
+    // Interactive waveform seeking & dragging
+    if (waveformContainer) {
+        const seekFromEvent = (e) => {
+            const rect = waveformContainer.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            updateWaveformProgress(pct * 100);
+            if (audio.duration && !isNaN(audio.duration)) {
+                audio.currentTime = pct * audio.duration;
+            }
+        };
 
-    // Reset play button on end
+        const handlePointerDown = (e) => {
+            e.stopPropagation();
+            isDragging = true;
+            seekFromEvent(e);
+
+            const handlePointerMove = (moveEvent) => {
+                if (!isDragging) return;
+                moveEvent.stopPropagation();
+                if (moveEvent.cancelable) moveEvent.preventDefault();
+                seekFromEvent(moveEvent);
+            };
+
+            const handlePointerUp = () => {
+                isDragging = false;
+                window.removeEventListener('mousemove', handlePointerMove);
+                window.removeEventListener('mouseup', handlePointerUp);
+                window.removeEventListener('touchmove', handlePointerMove);
+                window.removeEventListener('touchend', handlePointerUp);
+            };
+
+            window.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+            window.addEventListener('touchmove', handlePointerMove, { passive: false });
+            window.addEventListener('touchend', handlePointerUp);
+        };
+
+        waveformContainer.addEventListener('mousedown', handlePointerDown);
+        waveformContainer.addEventListener('touchstart', handlePointerDown, { passive: false });
+    }
+
+    // Reset play button on end and check for consecutive voice note autoplay
     audio.addEventListener('ended', () => {
-        playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
-        slider.value = 0;
+        if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        updateWaveformProgress(0);
         const totalMins = Math.floor(audio.duration / 60);
         const totalSecs = Math.floor(audio.duration % 60);
-        durationText.textContent = `${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+        if (durationText) durationText.textContent = `${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+
+        // WhatsApp-style consecutive autoplay
+        const nextVoiceNoteId = getNextConsecutiveVoiceNoteId(messageId);
+        if (nextVoiceNoteId) {
+            const nextGroupEl = document.getElementById(nextVoiceNoteId);
+            const nextPlayBtn = nextGroupEl?.querySelector('.wa-play-btn');
+            if (nextGroupEl && nextPlayBtn) {
+                playVoiceNoteTransitionChime();
+                try {
+                    nextGroupEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } catch (e) {}
+                setTimeout(() => {
+                    // Only autoplay if user is still in this chat and element still exists
+                    if (activeChatUid && document.getElementById(nextVoiceNoteId)) {
+                        nextPlayBtn.click();
+                    }
+                }, 180);
+            }
+        }
     });
 
     // Speed rate control
-    speedBtn.addEventListener('click', (e) => {
+    speedBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         if (speed === 1.0) {
             speed = 1.5;
@@ -6275,6 +6674,13 @@ const getMessageTextForDisplay = (msg, currentUser) => {
 const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
     const user = auth.currentUser;
     if (!user || !elements.messagesContainer) return;
+
+    // Chat isolation guard: ensure message belongs to currently active chat
+    const currentChatId = getCurrentChatId();
+    if (msg.chatId && currentChatId && msg.chatId !== currentChatId) {
+        cacheItem('messages', msg).catch(() => {});
+        return;
+    }
 
     // Update local store
     const localMsgIndex = messages.findIndex(m => m.id === msg.id);
@@ -6481,6 +6887,7 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                 const photoUrl = (senderProfile && senderProfile.profilePhoto) ? senderProfile.profilePhoto : '';
                 const fallbackImg = photoUrl ? `<img src="${photoUrl}" class="wa-player-avatar" onerror="this.onerror=null; this.src='/hotmapp-logo.png';">` : `<div class="wa-player-avatar-fallback"><i class="fa-solid fa-user"></i></div>`;
                 const isAudioSending = msg.status === 'sending';
+                const waveformBarsHtml = renderWaveformBarsHtml(msg.waveform, 34);
                 contentHtml = isAudioSending ? `
                     <div class="wa-audio-player wa-audio-uploading" style="display:flex; align-items:center; gap:10px; min-width: 200px;">
                         <div class="wa-player-avatar-container">
@@ -6500,10 +6907,15 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                                 ${fallbackImg}
                                 <span class="wa-player-mic-badge"><i class="fa-solid fa-microphone"></i></span>
                             </div>
-                            <button class="wa-play-btn"><i class="fa-solid fa-play"></i></button>
+                            <button class="wa-play-btn" aria-label="Play"><i class="fa-solid fa-play"></i></button>
                         </div>
                         <div class="wa-player-center">
-                            <input type="range" class="wa-progress-slider" min="0" max="100" value="0" step="0.1">
+                            <div class="wa-waveform-container" role="slider" aria-label="Audio seeker" tabindex="0">
+                                <div class="wa-waveform-track">
+                                    ${waveformBarsHtml}
+                                </div>
+                                <div class="wa-waveform-scrubber-dot"></div>
+                            </div>
                             <div class="wa-player-meta">
                                 <span class="wa-duration">0:00</span>
                             </div>
@@ -7015,6 +7427,11 @@ const startMessageListener = async (otherUid) => {
     const user = auth.currentUser;
     if (!user || !otherUid) return;
 
+    stopAllActiveMedia();
+    if (typeof hideVoicePreviewFn === 'function') {
+        hideVoicePreviewFn();
+    }
+
     // Unconditionally show the chat header and footer, and add the active chat selection class
     if (elements.chatHeader) elements.chatHeader.style.display = 'flex';
     if (elements.messageInputArea) elements.messageInputArea.style.display = 'flex';
@@ -7262,7 +7679,11 @@ const startMessageListener = async (otherUid) => {
             .sort((a, b) => a.id.localeCompare(b.id));
     }
 
-    const mergedMessages = mergeMessages(cachedMessages, pendingMessagesForChat, firebaseMessages);
+    const inFlightForThisChat = Array.from(activeMediaUploads.values())
+        .filter(u => u.chatId === chatId)
+        .map(u => u.placeholderMessage);
+
+    const mergedMessages = mergeMessages(cachedMessages, pendingMessagesForChat, inFlightForThisChat, firebaseMessages);
     mergedMessages.sort((a, b) => {
         const aTime = a.timestamp || 0;
         const bTime = b.timestamp || 0;
@@ -8740,6 +9161,10 @@ const renderChatPlaceholder = () => {
 };
 
 const showChatListView = () => {
+    stopAllActiveMedia();
+    if (typeof hideVoicePreviewFn === 'function') {
+        hideVoicePreviewFn();
+    }
     removeHistoryState('chat-view');
     elements.chatContainer?.classList.remove('viewing-chat');
     elements.mainAppContent?.classList.remove('header-hidden');
@@ -8775,7 +9200,18 @@ window.addEventListener('hotmapp-minimize-call', () => {
     }
 });
 
+// Dismiss message selection mode when requested by native back button
+window.addEventListener('hotmapp-cancel-selection', () => {
+    if (isSelectMode) {
+        toggleSelectMode(false);
+    }
+});
+
 window.addEventListener('hotmapp-back-button', () => {
+    if (isSelectMode) {
+        toggleSelectMode(false);
+        return;
+    }
     if (elements.chatContainer?.classList.contains('viewing-chat')) {
         if (peerConnections.size > 0 && currentCallType === 'video' && elements.callOverlay?.classList.contains('video-mode')) {
             toggleCallMinimize(true);
@@ -8786,6 +9222,10 @@ window.addEventListener('hotmapp-back-button', () => {
 });
 
 window.addEventListener('hotmapp-browser-back-to-base', () => {
+    if (isSelectMode) {
+        toggleSelectMode(false);
+        return;
+    }
     if (elements.chatContainer?.classList.contains('viewing-chat')) {
         showChatListView();
     }
@@ -9469,7 +9909,11 @@ export const initChatSelection = () => {
         const name = item.querySelector('.conversation-name')?.textContent?.trim();
         const avatarEl = item.querySelector('.conversation-avatar');
         activeChatUid = otherUid;
+        stopAllActiveMedia();
         hideReplyPreview();
+        if (typeof hideVoicePreviewFn === 'function') {
+            hideVoicePreviewFn();
+        }
 
         // Multitasking: Auto-minimize active call when switching chats
         if (peerConnections.size > 0) toggleCallMinimize(true);
@@ -13206,11 +13650,12 @@ export const initChatSelection = () => {
                 elements.lightboxForwardBtn.onclick = async () => {
                     if (elements.lightboxModal) elements.lightboxModal.style.display = 'none';
                     pendingForwardData = [{
-                        text: msg.text || '',
-                        type: msg.type,
-                        url: msg.url || null,
-                        fileName: msg.fileName || null,
-                        fileSize: msg.fileSize || null
+                        type: 'image',
+                        url: msg?.url || url || null,
+                        thumbnailUrl: msg?.thumbnailUrl || msg?.url || url || null,
+                        fileName: msg?.fileName || 'image.jpg',
+                        fileSize: msg?.fileSize || null,
+                        previewText: '📷 Image'
                     }];
                     selectedForwardRecipients.clear();
                     updateForwardButton();
@@ -13297,6 +13742,26 @@ export const initChatSelection = () => {
             videoEl.src = resolvedUrl;
             videoEl.style.display = 'block';
             videoEl.load();
+
+            stopAllActiveMedia();
+            const videoController = {
+                media: videoEl,
+                pause: () => {
+                    if (!videoEl.paused) {
+                        videoEl.pause();
+                    }
+                }
+            };
+            registerActiveMedia(videoController);
+
+            videoEl.onplay = () => registerActiveMedia(videoController);
+            videoEl.onpause = () => {
+                if (currentActiveMedia === videoController) currentActiveMedia = null;
+            };
+            videoEl.onended = () => {
+                if (currentActiveMedia === videoController) currentActiveMedia = null;
+            };
+
             videoEl.play().catch(e => console.log('Video autoplay blocked:', e));
         }
 
@@ -13343,11 +13808,13 @@ export const initChatSelection = () => {
                 elements.lightboxForwardBtn.onclick = async () => {
                     if (elements.lightboxModal) elements.lightboxModal.style.display = 'none';
                     pendingForwardData = [{
-                        text: msg.text || '',
-                        type: msg.type,
-                        url: msg.url || null,
-                        fileName: msg.fileName || null,
-                        fileSize: msg.fileSize || null
+                        type: 'video',
+                        url: msg?.url || url || null,
+                        thumbnailUrl: msg?.thumbnailUrl || null,
+                        fileName: msg?.fileName || 'video.mp4',
+                        fileSize: msg?.fileSize || null,
+                        duration: msg?.duration || null,
+                        previewText: '🎥 Video'
                     }];
                     selectedForwardRecipients.clear();
                     updateForwardButton();
