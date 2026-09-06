@@ -1089,6 +1089,12 @@ export const elements = {
     get chatMessageFontSizeValue() {
         return document.querySelector('[data-ui="chat-message-font-size-value"]');
     },
+    get chatFontStyleSelect() {
+        return document.querySelector('[data-ui="chat-font-style-select"]');
+    },
+    get chatFontPreview() {
+        return document.querySelector('[data-ui="chat-font-preview"]');
+    },
     get saveChatSettingsBtn() {
         return document.querySelector('[data-ui="save-chat-settings-btn"]');
     },

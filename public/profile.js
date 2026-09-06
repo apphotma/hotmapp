@@ -4,6 +4,9 @@ import { getUserProfile, updateUserProfile, uploadFile, deleteFile, getOrCreateI
 import { showToast } from './toast.js';
 import { hideElement, showElement, getAvatarUrl, compressImage, cropToSquare } from './utils.js';
 import { subscribeToAuthChanges } from './auth-service.js';
+import { FONT_STYLES, DEFAULT_FONT_STYLE, getFontStyleConfig } from './chat-font-styles.js';
+
+export { FONT_STYLES, DEFAULT_FONT_STYLE, getFontStyleConfig };
 
 export const initProfile = () => {
     const DEFAULT_SENT_COLOR = 'rgb(81,255,124)';
@@ -159,6 +162,19 @@ export const initProfile = () => {
 
         if (elements.chatMessageFontSizeSlider) elements.chatMessageFontSizeSlider.value = clampedFontSize;
         if (elements.chatMessageFontSizeValue) elements.chatMessageFontSizeValue.textContent = clampedFontSize;
+
+        const fontStyleKey = (settings?.fontStyle && FONT_STYLES[settings.fontStyle]) ? settings.fontStyle : DEFAULT_FONT_STYLE;
+        const fontConfig = FONT_STYLES[fontStyleKey] || FONT_STYLES[DEFAULT_FONT_STYLE];
+        document.documentElement.style.setProperty('--chat-font-family', fontConfig.family);
+
+        if (elements.chatFontStyleSelect) {
+            elements.chatFontStyleSelect.value = fontStyleKey;
+        }
+
+        if (elements.chatFontPreview) {
+            elements.chatFontPreview.style.fontFamily = fontConfig.family;
+            elements.chatFontPreview.style.fontSize = `${clampedFontSize}px`;
+        }
     };
 
     // Load and apply saved bubble colors on startup
@@ -182,6 +198,7 @@ export const initProfile = () => {
         if (elements.sentBubbleTextColorPicker) elements.sentBubbleTextColorPicker.value = bubbleSettings.sentTextColor || DEFAULT_SENT_TEXT_COLOR;
         if (elements.receivedBubbleTextColorPicker) elements.receivedBubbleTextColorPicker.value = bubbleSettings.receivedTextColor || DEFAULT_RECEIVED_TEXT_COLOR;
         if (elements.sendOnEnterCheckbox) elements.sendOnEnterCheckbox.checked = messageSettings.sendOnEnter === true;
+        if (elements.chatFontStyleSelect) elements.chatFontStyleSelect.value = messageSettings.fontStyle || DEFAULT_FONT_STYLE;
         applyMessageSettings(messageSettings);
         
         applyBubbleTheme(bubbleSettings);
@@ -212,7 +229,8 @@ export const initProfile = () => {
 
         const chatMessageSettings = {
             sendOnEnter: elements.sendOnEnterCheckbox?.checked ?? DEFAULT_SEND_ON_ENTER,
-            fontSize: Number(elements.chatMessageFontSizeSlider?.value || DEFAULT_MESSAGE_FONT_SIZE)
+            fontSize: Number(elements.chatMessageFontSizeSlider?.value || DEFAULT_MESSAGE_FONT_SIZE),
+            fontStyle: elements.chatFontStyleSelect?.value || DEFAULT_FONT_STYLE
         };
 
         try {
@@ -240,12 +258,13 @@ export const initProfile = () => {
     });
 
     elements.resetMessageFontBtn?.addEventListener('click', () => {
-        applyMessageSettings({ fontSize: DEFAULT_MESSAGE_FONT_SIZE });
+        applyMessageSettings({ fontSize: DEFAULT_MESSAGE_FONT_SIZE, fontStyle: DEFAULT_FONT_STYLE });
         localStorage.setItem('hotmapp_chat_message_settings', JSON.stringify({
             sendOnEnter: elements.sendOnEnterCheckbox?.checked ?? DEFAULT_SEND_ON_ENTER,
-            fontSize: DEFAULT_MESSAGE_FONT_SIZE
+            fontSize: DEFAULT_MESSAGE_FONT_SIZE,
+            fontStyle: DEFAULT_FONT_STYLE
         }));
-        showToast("Message font size reset to default", "info");
+        showToast("Chat font settings reset to default", "info");
     });
 
     elements.resetChatColorsBtn?.addEventListener('click', () => {
@@ -261,11 +280,11 @@ export const initProfile = () => {
                 receivedTextColor: DEFAULT_RECEIVED_TEXT_COLOR
             });
             applyChatBackground({ backgroundColor: '#ffffff' });
-            applyMessageSettings({ fontSize: DEFAULT_MESSAGE_FONT_SIZE });
+            applyMessageSettings({ fontSize: DEFAULT_MESSAGE_FONT_SIZE, fontStyle: DEFAULT_FONT_STYLE });
             localStorage.removeItem('hotmapp_chat_bg_settings');
 
             localStorage.removeItem('hotmapp_bubble_settings');
-            localStorage.setItem('hotmapp_chat_message_settings', JSON.stringify({ sendOnEnter: DEFAULT_SEND_ON_ENTER, fontSize: DEFAULT_MESSAGE_FONT_SIZE }));
+            localStorage.setItem('hotmapp_chat_message_settings', JSON.stringify({ sendOnEnter: DEFAULT_SEND_ON_ENTER, fontSize: DEFAULT_MESSAGE_FONT_SIZE, fontStyle: DEFAULT_FONT_STYLE }));
             showToast("Chat settings reset to default", "info");
         });
     // Chat Background Settings Handlers
@@ -284,12 +303,30 @@ export const initProfile = () => {
     elements.receivedBubbleTextColorPicker?.addEventListener('input', (e) => {
         const color = e.target.value;
         document.documentElement.style.setProperty('--wa-received-text', color);
+        if (elements.chatFontPreview) elements.chatFontPreview.style.color = color;
+    });
+
+    elements.receivedBubbleColorPicker?.addEventListener('input', (e) => {
+        const color = e.target.value;
+        if (elements.chatFontPreview) elements.chatFontPreview.style.backgroundColor = color;
     });
 
     elements.chatMessageFontSizeSlider?.addEventListener('input', (e) => {
         const fontSize = Number(e.target.value || DEFAULT_MESSAGE_FONT_SIZE);
         if (elements.chatMessageFontSizeValue) elements.chatMessageFontSizeValue.textContent = fontSize;
         document.documentElement.style.setProperty('--chat-message-font-size', `${fontSize}px`);
+        if (elements.chatFontPreview) {
+            elements.chatFontPreview.style.fontSize = `${fontSize}px`;
+        }
+    });
+
+    elements.chatFontStyleSelect?.addEventListener('change', (e) => {
+        const selectedKey = e.target.value;
+        const fontConfig = FONT_STYLES[selectedKey] || FONT_STYLES[DEFAULT_FONT_STYLE];
+        document.documentElement.style.setProperty('--chat-font-family', fontConfig.family);
+        if (elements.chatFontPreview) {
+            elements.chatFontPreview.style.fontFamily = fontConfig.family;
+        }
     });
 
     const openProfileModal = async (fromSettings = false) => {

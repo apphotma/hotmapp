@@ -13,6 +13,7 @@
     --wa-received: rgb(143,241,239);
     --wa-sent-text: #111b21;
     --wa-received-text: #111b21;
+    --chat-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Dark Theme */
@@ -10161,4 +10162,48 @@ body.dark-theme .link-qr-wrapper {
 .success-overlay-out .success-fullscreen-card {
     transform: scale(0.9) translateY(20px);
     transition: transform 0.4s ease;
+}
+
+/* ==========================================================================
+   Chat Font Style Customization
+   ========================================================================== */
+.chat-area,
+.chat-area .messages-container,
+.chat-area .message-bubble,
+.chat-area .message-text,
+.chat-area .quoted-message,
+.chat-area .quoted-text,
+.chat-area .message-input,
+.chat-area .pinned-message-text,
+.chat-area .user-status,
+.chat-font-preview-box {
+    font-family: var(--chat-font-family, 'Inter', system-ui, sans-serif);
+}
+
+/* Ensure FontAwesome icons within chat area preserve their icon font */
+.chat-area i,
+.chat-area [class*="fa-"],
+.chat-area .fa,
+.chat-area .fa-solid,
+.chat-area .fa-regular,
+.chat-area .fa-brands,
+.chat-font-preview-box i,
+.chat-font-preview-box [class*="fa-"] {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands", var(--fa-style-family, sans-serif) !important;
+}
+
+.chat-font-style-select {
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-font-style-select:focus {
+    border-color: var(--brand) !important;
+    box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.15) !important;
+    outline: none;
+}
+
+.chat-font-preview-box {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    word-break: break-word;
+    white-space: normal;
 }
