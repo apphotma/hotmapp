@@ -1988,10 +1988,10 @@ iframe {
 
 .message-bubble {
     max-width: 70%;
-    padding: 3px 8px 2rem 8px;
+    padding: 6px 9px 6px 9px;
     border-radius: 8px;
     position: relative;
-    line-height: 1.25;
+    line-height: 1.35;
     font-size: var(--chat-message-font-size, 0.92rem);
     white-space: wrap;
     overflow-wrap: break-word;
@@ -2061,11 +2061,14 @@ iframe {
 
 .message-meta {
     float: right;
-    margin: 1px -2px -3px 8px;
-    display: flex;
+    margin-left: 8px;
+    margin-top: 4px;
+    margin-bottom: -1px;
+    display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     position: relative;
+    line-height: 1;
 }
 
 .starred-indicator {
@@ -2091,8 +2094,10 @@ iframe {
 }
 
 .message-text {
+    display: inline;
     white-space: pre-wrap;
     word-break: break-word;
+    margin-right: 4px;
 }
 
 .message-text a {
@@ -8726,11 +8731,24 @@ body.dark-theme .link-qr-wrapper {
 }
 
 /* WhatsApp Voice Note Bubble styling */
+.message-bubble.audio {
+    padding: 6px 10px 8px 8px;
+    position: relative;
+    min-width: 260px;
+}
+
+.message-bubble.audio .message-meta {
+    position: absolute;
+    bottom: 5px;
+    right: 8px;
+    margin: 0;
+}
+
 .wa-audio-player {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 6px;
+    gap: 10px;
+    padding: 2px 2px 2px 0;
     width: 290px;
     max-width: 100%;
     background: transparent;
@@ -8960,9 +8978,13 @@ body.dark-theme .link-qr-wrapper {
 
 .wa-player-meta {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
     font-size: 0.72rem;
     color: #667781;
+    margin-top: 2px;
+    padding-right: 58px;
 }
 
 .dark-theme .wa-player-meta,
@@ -8970,33 +8992,66 @@ body.dark-theme .link-qr-wrapper {
     color: #8696a0;
 }
 
+.wa-duration {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
 .wa-speed-btn {
-    background: #f0f2f5;
+    background: rgba(0, 0, 0, 0.08);
     border: none;
     outline: none;
     cursor: pointer;
     color: #54656f;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    padding: 3px 6px;
-    border-radius: 12px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    line-height: 1.35;
     flex-shrink: 0;
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.1s;
 }
 
 .wa-speed-btn:hover {
-    background: #e1e3e6;
+    background: rgba(0, 0, 0, 0.15);
+    transform: scale(1.05);
+}
+
+.wa-speed-btn:active {
+    transform: scale(0.95);
+}
+
+.message-group.sent .wa-speed-btn {
+    background: rgba(0, 0, 0, 0.09);
+    color: #111b21;
+}
+
+.message-group.sent .wa-speed-btn:hover {
+    background: rgba(0, 0, 0, 0.16);
 }
 
 .dark-theme .wa-speed-btn,
 .oled-theme .wa-speed-btn {
-    background: #202c33;
-    color: #aebac1;
+    background: rgba(255, 255, 255, 0.12);
+    color: #e9edef;
 }
 
 .dark-theme .wa-speed-btn:hover,
 .oled-theme .wa-speed-btn:hover {
-    background: #2a3942;
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.dark-theme .message-group.sent .wa-speed-btn,
+.oled-theme .message-group.sent .wa-speed-btn {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+
+.dark-theme .message-group.sent .wa-speed-btn:hover,
+.oled-theme .message-group.sent .wa-speed-btn:hover {
+    background: rgba(255, 255, 255, 0.26);
 }
 
 /* Responsive grid for product modal inputs */

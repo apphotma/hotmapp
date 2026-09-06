@@ -153,8 +153,8 @@
     </div>
 
     <!-- Document Signer Modal -->
-    <div class="doc-sign-modal modal-overlay" data-ui="doc-sign-modal" style="display:none;">
-        <div class="editor-container">
+    <div class="doc-sign-modal modal-overlay" data-ui="doc-sign-modal" style="display:none; z-index: 5080;">
+        <div class="editor-container" style="z-index: 5080;">
             <!-- Header Toolbar -->
             <div class="editor-header">
                 <button class="editor-icon-btn close-btn" data-ui="doc-sign-cancel" title="Cancel">
@@ -4251,8 +4251,7 @@
                 </div>
                 <div class="pdf-viewer-header">
                     <div class="pdf-actions">
-                        <button class="pdf-action-btn" data-ui="pdf-viewer-sign-btn" title="Sign PDF"
-                            style="display: none;">
+                        <button class="pdf-action-btn" data-ui="pdf-viewer-sign-btn" title="Sign / Edit Document">
                             <i class="fa-solid fa-signature"></i>
                         </button>
 

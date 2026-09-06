@@ -631,16 +631,24 @@ export const generateOrderInvoiceDoc = async (order, options = {}) => {
 
     let transparentLogoBase64 = null;
     let bizProfile = null;
+    let sellerProfile = null;
     let bizAddress = "Not specified";
 
     if (order.sellerId) {
-        bizProfile = getBusinessProfile(order.sellerId);
+        try {
+            bizProfile = await getBusinessProfile(order.sellerId);
+        } catch (e) {
+            console.warn("Failed to get business profile for invoice:", e);
+        }
         if (!bizProfile) {
             try {
                 const snap = await get(ref(db, `businesses/${order.sellerId}`));
-                if (snap.exists()) bizProfile = snap.val();
+                if (snap && snap.exists()) bizProfile = snap.val();
             } catch (e) {}
         }
+        try {
+            sellerProfile = await getUserProfile(order.sellerId);
+        } catch (e) {}
     }
 
     if (bizProfile) {
@@ -648,37 +656,128 @@ export const generateOrderInvoiceDoc = async (order, options = {}) => {
             bizAddress = bizProfile.pickupLocations[0].address;
         } else if (bizProfile.pickupAddress) {
             bizAddress = bizProfile.pickupAddress;
+        } else if (bizProfile.address) {
+            bizAddress = bizProfile.address;
         }
-        const logoUrl = bizProfile.logoUrl || bizProfile.businessLogo;
-        if (logoUrl) {
-            try {
-                transparentLogoBase64 = await new Promise((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin = 'Anonymous';
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.globalAlpha = 0.12;
-                        ctx.drawImage(img, 0, 0);
-                        resolve(canvas.toDataURL('image/png'));
-                    };
-                    img.onerror = () => resolve(null);
-                    img.src = logoUrl;
-                });
-            } catch (e) {}
+    } else if (cachedBizProfile) {
+        if (cachedBizProfile.pickupLocations && cachedBizProfile.pickupLocations.length > 0) {
+            bizAddress = cachedBizProfile.pickupLocations[0].address;
+        } else if (cachedBizProfile.pickupAddress) {
+            bizAddress = cachedBizProfile.pickupAddress;
         }
     }
 
+    // Create a semi-transparent Hotmapp watermark logo using a client-side canvas
+    try {
+        // 1. Try DOM canvas drawing first (synchronous & works offline/file://)
+        const logoImgEl = document.querySelector('.app-logo') || document.querySelector('img[src*="hotmapp-logo"]');
+        if (logoImgEl && logoImgEl.complete && logoImgEl.naturalWidth > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = logoImgEl.naturalWidth;
+            canvas.height = logoImgEl.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 0.15; // 15% opacity acts as a subtle yet visible trademark watermark
+            ctx.drawImage(logoImgEl, 0, 0);
+            transparentLogoBase64 = canvas.toDataURL('image/png');
+        }
+    } catch (e) {
+        console.warn("DOM canvas watermark failed, falling back to image load:", e);
+    }
+
+    if (!transparentLogoBase64) {
+        try {
+            // 2. Load hotmapp-logo.png directly
+            transparentLogoBase64 = await new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth || img.width || 300;
+                        canvas.height = img.naturalHeight || img.height || 300;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.globalAlpha = 0.15;
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch (err) {
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = 'hotmapp-logo.png';
+                setTimeout(() => resolve(null), 3000);
+            });
+        } catch (e) {
+            console.warn("Direct image load watermark failed:", e);
+        }
+    }
+
+    if (!transparentLogoBase64) {
+        try {
+            // 3. Fallback via getBase64ImageFromUrl
+            const rawBase64 = await getBase64ImageFromUrl('hotmapp-logo.png');
+            if (rawBase64) {
+                transparentLogoBase64 = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width || 300;
+                            canvas.height = img.height || 300;
+                            const ctx = canvas.getContext('2d');
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.globalAlpha = 0.15;
+                            ctx.drawImage(img, 0, 0);
+                            resolve(canvas.toDataURL('image/png'));
+                        } catch (err) {
+                            resolve(null);
+                        }
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = rawBase64;
+                    setTimeout(() => resolve(null), 3000);
+                });
+            }
+        } catch (e) {}
+    }
+
+    // Add transparent watermark logo in the middle of the invoice page
+    // A4 dimensions: 210 x 297 mm. Center: x = 105 - 50 = 55, y = 148.5 - 50 = 98.5
     if (transparentLogoBase64) {
         try {
             doc.addImage(transparentLogoBase64, 'PNG', 55, 98.5, 100, 100);
-        } catch (err) {}
+        } catch (err) {
+            console.warn("Error adding watermark logo to PDF:", err);
+        }
     }
 
-    const bizName = bizProfile?.companyName ? bizProfile.companyName.trim().toUpperCase() : "HOTMAPP";
+    // Resolve seller business name for invoice header
+    const candidateBizName = 
+        options.sellerBusinessName ||
+        options.businessName ||
+        options.sellerName ||
+        order.businessName ||
+        order.companyName ||
+        order.sellerName ||
+        bizProfile?.companyName ||
+        bizProfile?.businessName ||
+        bizProfile?.name ||
+        cachedBizProfile?.companyName ||
+        cachedBizProfile?.businessName ||
+        sellerProfile?.businessProfile?.companyName ||
+        sellerProfile?.businessProfile?.businessName ||
+        sellerProfile?.companyName ||
+        sellerProfile?.businessName ||
+        sellerProfile?.fullname ||
+        sellerProfile?.displayName ||
+        sellerProfile?.username;
+
+    const bizName = (candidateBizName && candidateBizName.trim()) 
+        ? candidateBizName.trim().toUpperCase() 
+        : "HOTMAPP";
+
     doc.setFontSize(22);
     doc.setTextColor(18, 140, 126);
     doc.text(`${bizName} ORDER INVOICE`, 105, 20, { align: "center" });
@@ -2451,6 +2550,7 @@ const handleStarRating = (e) => {
                     id: orderId,
                     buyerId: user.uid,
                     sellerId: currentActiveChatUid,
+                    businessName: cachedBizProfile?.companyName || cachedBizProfile?.businessName || null,
                     chatId: chatId,
                     timestamp: Date.now(),
                     deliveryMethod: deliveryMethod,

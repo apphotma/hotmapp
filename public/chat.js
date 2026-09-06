@@ -903,6 +903,60 @@ window.downloadChatInvoice = async (invoiceIdOrMsgId) => {
 };
 
 /**
+ * Opens document signer directly for an order invoice or PDF document.
+ */
+window.signChatInvoice = async (invoiceIdOrMsgId) => {
+    try {
+        showToast("Preparing document for signing...", "info");
+        let order = null;
+        let msg = null;
+
+        if (invoiceIdOrMsgId) {
+            order = await getOrder(invoiceIdOrMsgId);
+            if (!order) {
+                msg = messages.find(m => m.id === invoiceIdOrMsgId || m.invoiceId === invoiceIdOrMsgId);
+                if (msg && msg.invoiceId) {
+                    order = await getOrder(msg.invoiceId);
+                }
+            }
+        }
+
+        let blob = null;
+        let fileName = 'Invoice.pdf';
+
+        if (order) {
+            const { blob: b, orderNumber } = await generateOrderInvoiceDoc(order);
+            blob = b;
+            fileName = `Invoice_${orderNumber || order.id || 'HOTMAPP'}.pdf`;
+        } else {
+            if (!msg) msg = messages.find(m => m.id === invoiceIdOrMsgId);
+            if (msg && msg.url) {
+                const resp = await fetch(msg.url);
+                blob = await resp.blob();
+                fileName = msg.fileName || 'Document.pdf';
+            }
+        }
+
+        if (!blob) {
+            showToast("Could not find document details for signing.", "error");
+            return;
+        }
+
+        const signedBlob = await openDocSigner(blob);
+        if (signedBlob) {
+            showToast("Sending signed document...", "info");
+            const baseName = fileName.replace(/\.pdf$/i, '');
+            const sFilename = baseName.startsWith('signed_') ? `${baseName}.pdf` : `signed_${baseName}.pdf`;
+            const targetUid = (order && (order.sellerId !== auth.currentUser?.uid ? order.sellerId : order.buyerId)) || activeChatUid;
+            await sendMedia('document', signedBlob, sFilename, targetUid);
+        }
+    } catch (err) {
+        console.error("Error signing chat invoice:", err);
+        showToast("Error loading document for signing.", "error");
+    }
+};
+
+/**
  * Opens the internal PDF viewer modal
  */
 window.openPdfViewer = async (url, msgId = null, customFileName = null, customDoc = null) => {
@@ -960,32 +1014,40 @@ window.openPdfViewer = async (url, msgId = null, customFileName = null, customDo
         }
 
         if (elements.pdfViewerSignBtn) {
-            const isSignable = (msg && msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf') && !msg.deleted) ||
-                (msg && msg.type === 'order') ||
-                (pdfUrl && (pdfUrl.toLowerCase().includes('.pdf') || pdfUrl.toLowerCase().includes('invoice')));
-            if (isSignable) {
-                elements.pdfViewerSignBtn.style.display = 'grid';
-                elements.pdfViewerSignBtn.onclick = async () => {
-                    elements.pdfViewerModal.style.display = 'none';
-                    showToast("Downloading document for signing...", "info");
-                    try {
+            // Every document in the PDF viewer is a PDF and can be signed/edited
+            elements.pdfViewerSignBtn.style.display = 'grid';
+            elements.pdfViewerSignBtn.title = 'Sign / Edit Document';
+            elements.pdfViewerSignBtn.onclick = async () => {
+                elements.pdfViewerModal.style.display = 'none';
+                showToast("Preparing document for signing...", "info");
+                try {
+                    let blob = null;
+                    if (customDoc && typeof customDoc.output === 'function') {
+                        blob = customDoc.output('blob');
+                    } else if (pdfUrl) {
                         const resp = await fetch(pdfUrl);
-                        const blob = await resp.blob();
-                        const signedBlob = await openDocSigner(blob);
-                        if (signedBlob) {
-                            showToast("Sending signed document...", "info");
-                            const sFilename = (msg && msg.fileName) ? msg.fileName : (msg && msg.type === 'order' ? `signed_invoice_${msg.id.substring(0, 6)}.pdf` : 'signed_document.pdf');
-                            await sendMedia('document', signedBlob, sFilename);
+                        blob = await resp.blob();
+                    } else if (msg && (msg.type === 'order' || msg.invoiceId)) {
+                        const order = await getOrder(msg.invoiceId || msg.id);
+                        if (order) {
+                            const res = await generateOrderInvoiceDoc(order);
+                            blob = res.blob;
                         }
-                    } catch (err) {
-                        console.error("Failed to download or sign document:", err);
-                        showToast("Error loading document for signing.", "error");
                     }
-                };
-            } else {
-                elements.pdfViewerSignBtn.style.display = 'none';
-                elements.pdfViewerSignBtn.onclick = null;
-            }
+                    if (!blob) throw new Error("Could not load PDF data");
+                    const signedBlob = await openDocSigner(blob);
+                    if (signedBlob) {
+                        showToast("Sending signed document...", "info");
+                        let sFilename = (msg && msg.fileName) ? msg.fileName : (fileName || 'document.pdf');
+                        const baseName = sFilename.replace(/\.pdf$/i, '');
+                        sFilename = baseName.startsWith('signed_') ? `${baseName}.pdf` : `signed_${baseName}.pdf`;
+                        await sendMedia('document', signedBlob, sFilename);
+                    }
+                } catch (err) {
+                    console.error("Failed to download or sign document:", err);
+                    showToast("Error loading document for signing.", "error");
+                }
+            };
         }
 
         elements.pdfViewerModal.style.display = 'flex';
@@ -1030,6 +1092,7 @@ window.loadAndRenderInvoiceCard = async (msgId, invoiceId, isSent) => {
         const viewButtonHtml = `
             <div style="display: flex; gap: 6px; flex: 1; align-items: center;">
                 <button onclick="window.viewChatInvoice('${order.id || invoiceId || msgId}')" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; background: white; border: 1px solid var(--border); padding: 5px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600;"><i class="fa-solid fa-file-pdf" style="color: #008069;"></i> View PDF</button>
+                <button onclick="window.signChatInvoice('${order.id || invoiceId || msgId}')" style="display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600; color: #008069;" title="Sign / Edit Document"><i class="fa-solid fa-signature"></i></button>
                 <button onclick="window.downloadChatInvoice('${order.id || invoiceId || msgId}')" style="display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 0.76rem; font-weight: 600;" title="Download PDF"><i class="fa-solid fa-download" style="color: #008069;"></i></button>
             </div>
         `;
@@ -2449,7 +2512,10 @@ const updateSelectionUI = () => {
                 const msg = messages.find(m => m.id === msgId);
                 if (msg && !msg.deleted) {
                     showEditImage = msg.type === 'image';
-                    showSignDoc = msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf');
+                    showSignDoc = (msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf')) ||
+                        msg.type === 'order' ||
+                        msg.type === 'invoice' ||
+                        !!msg.invoiceId;
                 }
             }
             if (elements.selectionEditImageBtn) elements.selectionEditImageBtn.style.display = 'none';
@@ -6918,9 +6984,9 @@ const displayMessage = (msg, isReRendering = false, insertAtTop = false) => {
                             </div>
                             <div class="wa-player-meta">
                                 <span class="wa-duration">0:00</span>
+                                <button class="wa-speed-btn" type="button" aria-label="Playback speed">1.0x</button>
                             </div>
                         </div>
-                        <button class="wa-speed-btn">1.0x</button>
                     </div>
                 `;
                 break;
@@ -8333,7 +8399,10 @@ const openContextMenu = (msgId, x, y) => {
 
         const signDocBtn = menu.querySelector('[data-action="sign-document"]');
         if (signDocBtn) {
-            const isPdf = msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf');
+            const isPdf = (msg.type === 'document' && msg.fileName && msg.fileName.toLowerCase().endsWith('.pdf')) ||
+                msg.type === 'order' ||
+                msg.type === 'invoice' ||
+                !!msg.invoiceId;
             signDocBtn.style.display = isPdf ? 'flex' : 'none';
         }
 
@@ -10266,21 +10335,9 @@ export const initChatSelection = () => {
         if (selectedMessages.size !== 1) return;
         const msgId = Array.from(selectedMessages)[0];
         const msg = messages.find(m => m.id === msgId);
-        if (msg && msg.url) {
-            showToast("Downloading document for signing...", "info");
-            try {
-                const resp = await fetch(msg.url);
-                const blob = await resp.blob();
-                const signedBlob = await openDocSigner(blob);
-                if (signedBlob) {
-                    showToast("Sending signed document...", "info");
-                    await sendMedia('document', signedBlob, msg.fileName || 'signed_document.pdf');
-                    toggleSelectMode(false);
-                }
-            } catch (err) {
-                console.error("Failed to download or sign document:", err);
-                showToast("Error loading document for signing.", "error");
-            }
+        if (msg) {
+            toggleSelectMode(false);
+            await window.signChatInvoice(msg.invoiceId || msg.id);
         }
     });
     elements.cancelSelectionBtn?.addEventListener('click', () => toggleSelectMode(false));
@@ -10623,21 +10680,9 @@ export const initChatSelection = () => {
             elements.selectionEllipsisMenu.style.display = 'none';
             const msgId = Array.from(selectedMessages)[0];
             const msg = messages.find(m => m.id === msgId);
-            if (msg && msg.url) {
-                showToast("Downloading document for signing...", "info");
-                try {
-                    const resp = await fetch(msg.url);
-                    const blob = await resp.blob();
-                    const signedBlob = await openDocSigner(blob);
-                    if (signedBlob) {
-                        showToast("Sending signed document...", "info");
-                        await sendMedia('document', signedBlob, msg.fileName || 'signed_document.pdf');
-                        toggleSelectMode(false);
-                    }
-                } catch (err) {
-                    console.error("Failed to download or sign document:", err);
-                    showToast("Error loading document for signing.", "error");
-                }
+            if (msg) {
+                toggleSelectMode(false);
+                await window.signChatInvoice(msg.invoiceId || msg.id);
             }
         }
     });
@@ -10890,21 +10935,9 @@ export const initChatSelection = () => {
                 }
                 break;
             case 'sign-document':
-                if (msg && msg.url) {
+                if (msg) {
                     if (elements.messageContextMenu) elements.messageContextMenu.style.display = 'none';
-                    showToast("Downloading document for signing...", "info");
-                    try {
-                        const resp = await fetch(msg.url);
-                        const blob = await resp.blob();
-                        const signedBlob = await openDocSigner(blob);
-                        if (signedBlob) {
-                            showToast("Sending signed document...", "info");
-                            await sendMedia('document', signedBlob, msg.fileName || 'signed_document.pdf');
-                        }
-                    } catch (err) {
-                        console.error("Failed to download or sign document:", err);
-                        showToast("Error loading document for signing.", "error");
-                    }
+                    await window.signChatInvoice(msg.invoiceId || msg.id);
                 }
                 break;
             case 'pin':
@@ -14651,6 +14684,11 @@ const openChatInvoicesModal = async () => {
                             style="background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
                             <i class="fa-solid fa-download"></i>
                         </button>
+                        <button onclick="window.signChatInvoice('${order.id || invoiceId || msg.id}')" 
+                            title="Sign / Edit Document"
+                            style="background: var(--panel); border: 1px solid var(--border); color: var(--brand-dark); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-signature"></i> Sign
+                        </button>
                         <button onclick="window.viewChatInvoice('${order.id || invoiceId || msg.id}')" 
                             style="background: var(--brand-light); color: var(--brand-dark); border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
                             <i class="fa-solid fa-file-pdf"></i> View PDF
@@ -14672,6 +14710,11 @@ const openChatInvoicesModal = async () => {
                             title="Download PDF"
                             style="background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
                             <i class="fa-solid fa-download"></i>
+                        </button>
+                        <button onclick="window.signChatInvoice('${msg.id}')" 
+                            title="Sign / Edit Document"
+                            style="background: var(--panel); border: 1px solid var(--border); color: var(--brand-dark); padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-signature"></i> Sign
                         </button>
                         <button onclick="window.viewChatInvoice('${msg.id}')" 
                             style="background: var(--brand-light); color: var(--brand-dark); border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; display: flex; align-items: center; gap: 4px;">
