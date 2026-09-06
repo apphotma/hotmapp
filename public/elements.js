@@ -237,6 +237,9 @@ export const elements = {
     get addProductForm() {
         return document.querySelector('[data-ui="add-product-form"]');
     },
+    get productDescInput() {
+        return document.querySelector('[data-ui="p-desc"]') || document.getElementById('p-desc');
+    },
     get closeModalBtn() {
         return document.querySelector('[data-ui="close-product-modal"]');
     },

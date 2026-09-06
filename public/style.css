@@ -4856,6 +4856,17 @@ iframe {
     box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
 }
 
+#p-desc {
+    min-height: 64px;
+    max-height: 220px;
+    line-height: 1.5;
+    resize: none;
+    overflow-y: auto;
+    box-sizing: border-box;
+    font-family: inherit;
+    word-break: break-word;
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

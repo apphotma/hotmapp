@@ -1005,7 +1005,20 @@ window.openPdfViewer = async (url, msgId = null, customFileName = null, customDo
         if (elements.printPdfViewerBtn) {
             elements.printPdfViewerBtn.dataset.url = pdfUrl;
             elements.printPdfViewerBtn.onclick = () => {
-                window.open(pdfUrl, '_blank');
+                try {
+                    if (elements.pdfViewerIframe && elements.pdfViewerIframe.contentWindow && elements.pdfViewerIframe.style.display !== 'none') {
+                        elements.pdfViewerIframe.contentWindow.focus();
+                        elements.pdfViewerIframe.contentWindow.print();
+                        return;
+                    }
+                } catch (e) {}
+                const printWin = window.open(pdfUrl, '_blank');
+                if (printWin) {
+                    printWin.focus();
+                    try {
+                        printWin.print();
+                    } catch (e) {}
+                }
             };
         }
 

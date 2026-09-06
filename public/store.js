@@ -2545,6 +2545,23 @@ export const initStore = () => {
     elements.generalMarketProductGrid?.addEventListener('click', handleViewShopClick);
     elements.recentlyViewedGrid?.addEventListener('click', handleViewShopClick);
 
+    // Auto-resizing for Product Description textarea (#p-desc)
+    const autoResizeProductDesc = (el) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    };
+
+    const productDescInput = elements.productDescInput || document.getElementById('p-desc');
+    productDescInput?.addEventListener('input', function () {
+        autoResizeProductDesc(this);
+    });
+    elements.addProductForm?.addEventListener('input', (e) => {
+        if (e.target && (e.target.id === 'p-desc' || e.target.name === 'desc')) {
+            autoResizeProductDesc(e.target);
+        }
+    });
+
     elements.addProductBtn?.addEventListener('click', (e) => {
         if (!isBusinessRegistered) {
             showToast("Please register your business first!", "warning");
@@ -2563,6 +2580,8 @@ export const initStore = () => {
 
             editingProductId = null;
             elements.addProductForm?.reset();
+            const descEl = elements.productDescInput || document.getElementById('p-desc');
+            if (descEl) descEl.style.height = 'auto';
             if (elements.productImgData) elements.productImgData.value = '';
             renderPreviews([]);
             if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'none';
@@ -2679,10 +2698,16 @@ export const initStore = () => {
 
     elements.closeModalBtn?.addEventListener('click', () => {
         if (elements.productModal) elements.productModal.style.display = 'none';
+        const descEl = elements.productDescInput || document.getElementById('p-desc');
+        if (descEl) descEl.style.height = 'auto';
     });
 
     elements.productModal?.addEventListener('click', (e) => {
-        if (e.target === elements.productModal) elements.productModal.style.display = 'none';
+        if (e.target === elements.productModal) {
+            elements.productModal.style.display = 'none';
+            const descEl = elements.productDescInput || document.getElementById('p-desc');
+            if (descEl) descEl.style.height = 'auto';
+        }
     });
 
     elements.productCurrencySelect?.addEventListener('change', (e) => {
@@ -3172,6 +3197,9 @@ export const initStore = () => {
             const modalTitle = elements.productModal?.querySelector('h3');
             if (modalTitle) modalTitle.textContent = 'Edit Product';
             if (elements.productModal) elements.productModal.style.display = 'flex';
+            requestAnimationFrame(() => {
+                autoResizeProductDesc(form['desc'] || elements.productDescInput || document.getElementById('p-desc'));
+            });
         }
     });
 
@@ -3293,6 +3321,8 @@ export const initStore = () => {
             if (elements.productImgData) elements.productImgData.value = '';
             renderPreviews([]);
             e.target.reset();
+            const descEl = elements.productDescInput || document.getElementById('p-desc');
+            if (descEl) descEl.style.height = 'auto';
             editingProductId = null;
         } catch (error) {
             console.error("Save Error:", error);
