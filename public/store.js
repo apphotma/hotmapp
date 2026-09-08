@@ -1245,6 +1245,7 @@ const renderGrids = (products) => {
                     <div class="product-actions">
                         <button type="button" class="toggle-sold-out-btn" title="${product.soldOut ? 'Mark as Available' : 'Mark as Ready Soon'}">${product.soldOut ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-ban"></i>'}</button>
                         <button type="button" class="edit-product-card-btn" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button type="button" class="duplicate-product-card-btn" title="Duplicate Product"><i class="fa-solid fa-clone"></i></button>
                         <button type="button" class="delete-product-card-btn" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
                     <div class="image-loader-wrapper">
@@ -2585,6 +2586,9 @@ export const initStore = () => {
             if (elements.productImgData) elements.productImgData.value = '';
             renderPreviews([]);
             if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'none';
+            if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
+            const submitBtn = elements.addProductForm?.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.textContent = 'Add Product';
 
             // Auto-fill currency with last used currency if exists
             const lastCurrency = localStorage.getItem('hotmapp_last_currency');
@@ -2700,6 +2704,7 @@ export const initStore = () => {
         if (elements.productModal) elements.productModal.style.display = 'none';
         const descEl = elements.productDescInput || document.getElementById('p-desc');
         if (descEl) descEl.style.height = 'auto';
+        if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
     });
 
     elements.productModal?.addEventListener('click', (e) => {
@@ -2707,6 +2712,7 @@ export const initStore = () => {
             elements.productModal.style.display = 'none';
             const descEl = elements.productDescInput || document.getElementById('p-desc');
             if (descEl) descEl.style.height = 'auto';
+            if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
         }
     });
 
@@ -2715,6 +2721,18 @@ export const initStore = () => {
             elements.productCustomCurrencyInput.style.display =
                 e.target.value === 'custom' ? 'block' : 'none';
         }
+    });
+
+    elements.duplicateAsNewBtn?.addEventListener('click', () => {
+        editingProductId = null;
+        const modalTitle = elements.productModal?.querySelector('h3');
+        if (modalTitle) modalTitle.textContent = 'Duplicate Product';
+        const submitBtn = elements.addProductForm?.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Add Product';
+        if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
+        showToast("Switched to Duplicate mode. Modifying will create a new product.", "info");
+        const form = elements.addProductForm;
+        form?.['form']?.focus();
     });
 
     elements.uploadProductBtn?.addEventListener('click', () => {
@@ -3196,9 +3214,79 @@ export const initStore = () => {
 
             const modalTitle = elements.productModal?.querySelector('h3');
             if (modalTitle) modalTitle.textContent = 'Edit Product';
+            const submitBtn = elements.addProductForm?.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.textContent = 'Update Product';
+            if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'flex';
+
             if (elements.productModal) elements.productModal.style.display = 'flex';
             requestAnimationFrame(() => {
                 autoResizeProductDesc(form['desc'] || elements.productDescInput || document.getElementById('p-desc'));
+            });
+        } else if (e.target.closest('.duplicate-product-card-btn')) {
+            const productId = card.dataset.id;
+            const product = cachedProducts[productId];
+            const name = card.querySelector('.product-name')?.textContent || product?.name || '';
+            const desc = card.querySelector('.product-desc')?.textContent || product?.desc || '';
+            const formValue = product ? product.form : card.querySelector('.product-form')?.textContent.replace(/^Form:\s*/i, '') || '';
+            const qtyValue = product ? product.qty : card.querySelector('.product-quantity')?.textContent.replace(/^Quantity:\s*/i, '') || '';
+            const storeQtyValue = product ? (product.storeQty || 0) : 0;
+            const priceText = card.querySelector('.product-price')?.textContent || '';
+            const currencySymbol = priceText.match(/^[^0-9]*/)?.[0] || product?.currency || '$';
+            const priceValue = priceText.slice(currencySymbol.length) || product?.price || '';
+            const imgUrl = card.querySelector('.product-img')?.src || '';
+            const cardImagesAttr = card.getAttribute('data-images');
+
+            let images = [];
+            if (cardImagesAttr) {
+                try { images = JSON.parse(cardImagesAttr); } catch (err) { images = imgUrl ? [imgUrl] : []; }
+            } else if (product?.images) {
+                images = product.images;
+            } else if (imgUrl) {
+                images = [imgUrl];
+            }
+
+            // CRITICAL: Set editingProductId to null so saving creates a brand new product
+            editingProductId = null;
+
+            const form = elements.addProductForm;
+            if (form) {
+                form['name'].value = name;
+                if (form['category']) form['category'].value = product?.category || '';
+                form['desc'].value = desc;
+                form['form'].value = formValue;
+                form['qty'].value = qtyValue || '';
+                if (form['store_qty']) form['store_qty'].value = storeQtyValue || '';
+
+                const hasPreset = Array.from(elements.productCurrencySelect?.options || [])
+                    .some(opt => opt.value === currencySymbol);
+
+                if (hasPreset) {
+                    form['currency'].value = currencySymbol;
+                    if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'none';
+                } else {
+                    form['currency'].value = 'custom';
+                    if (form['custom_currency']) form['custom_currency'].value = currencySymbol;
+                    if (elements.productCustomCurrencyInput) elements.productCustomCurrencyInput.style.display = 'block';
+                }
+
+                form['price'].value = formatNumberWithCommas(priceValue);
+            }
+
+            if (elements.productImgData) elements.productImgData.value = JSON.stringify(images);
+            renderPreviews(images);
+
+            const modalTitle = elements.productModal?.querySelector('h3');
+            if (modalTitle) modalTitle.textContent = 'Duplicate Product';
+
+            const submitBtn = elements.addProductForm?.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.textContent = 'Add Product';
+
+            if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
+
+            if (elements.productModal) elements.productModal.style.display = 'flex';
+            requestAnimationFrame(() => {
+                autoResizeProductDesc(form?.['desc'] || elements.productDescInput || document.getElementById('p-desc'));
+                form?.['form']?.focus();
             });
         }
     });
@@ -3323,6 +3411,7 @@ export const initStore = () => {
             e.target.reset();
             const descEl = elements.productDescInput || document.getElementById('p-desc');
             if (descEl) descEl.style.height = 'auto';
+            if (elements.duplicateAsNewBtn) elements.duplicateAsNewBtn.style.display = 'none';
             editingProductId = null;
         } catch (error) {
             console.error("Save Error:", error);

@@ -243,6 +243,9 @@ export const elements = {
     get closeModalBtn() {
         return document.querySelector('[data-ui="close-product-modal"]');
     },
+    get duplicateAsNewBtn() {
+        return document.querySelector('[data-ui="duplicate-as-new-btn"]') || document.getElementById('duplicate-as-new-btn');
+    },
     get productImgPreview() {
         return document.querySelector('[data-ui="product-img-preview"]');
     },

@@ -4587,6 +4587,7 @@ iframe {
 }
 
 .edit-product-card-btn,
+.duplicate-product-card-btn,
 .delete-product-card-btn,
 .toggle-sold-out-btn {
     width: 32px;
@@ -4615,9 +4616,38 @@ iframe {
     color: #007185;
 }
 
+.duplicate-product-card-btn:hover {
+    background: #f0fdf4;
+    color: var(--brand, #00a884);
+}
+
 .delete-product-card-btn:hover {
     background: #fde8e8;
     color: #c40000;
+}
+
+.duplicate-as-new-btn {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    background: var(--panel-soft);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.duplicate-as-new-btn:hover {
+    background: var(--panel);
+    border-color: var(--brand);
+    color: var(--brand);
 }
 
 .product-img {
@@ -8059,6 +8089,7 @@ iframe {
     }
 
     .edit-product-card-btn,
+    .duplicate-product-card-btn,
     .delete-product-card-btn,
     .toggle-sold-out-btn {
         width: 24px !important;
