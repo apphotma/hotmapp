@@ -17,9 +17,9 @@ export const getAppPlatform = () => {
 
 // Current App Build Constants
 export const APP_METADATA = {
-    version: '1.0.8',       // Native Android versionName
-    versionCode: 34,        // Native Android versionCode
-    webVersion: '1.1.22',   // Web build version
+    version: '1.0.9',       // Native Android versionName
+    versionCode: 35,        // Native Android versionCode
+    webVersion: '1.1.23',   // Web build version
     get platform() {
         return getAppPlatform();
     }
