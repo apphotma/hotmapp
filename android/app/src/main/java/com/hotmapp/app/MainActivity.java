@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ScreenSharePlugin.class);
         registerPlugin(WebRtcAudioPlugin.class);
+        registerPlugin(PipPlugin.class);
 
         webrtcPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
@@ -86,6 +87,33 @@ public class MainActivity extends BridgeActivity {
         } else if (callback != null) {
             callback.onResult(true);
         }
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (PipPlugin.isPipEnabled()) {
+            PipPlugin.enterPip(this);
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, android.content.res.Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        PipPlugin.onPictureInPictureModeChanged(isInPictureInPictureMode);
+    }
+
+    @Override
+    public void onPause() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            super.onPause();
+            // In PiP mode, ensure WebView continues playback and does not freeze
+            if (this.bridge != null && this.bridge.getWebView() != null) {
+                this.bridge.getWebView().onResume();
+            }
+            return;
+        }
+        super.onPause();
     }
 }
 

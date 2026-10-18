@@ -4054,6 +4054,70 @@ const setNativeSpeakerphone = (enabled) => {
     }
 };
 
+let wasInAppMinimizedBeforeNativePip = false;
+
+const setNativePipMode = (enabled) => {
+    try {
+        if (window.Capacitor?.Plugins?.PipPlugin) {
+            window.Capacitor.Plugins.PipPlugin.setPipMode({
+                enabled: !!enabled,
+                aspectRatioNumerator: 9,
+                aspectRatioDenominator: 16
+            }).catch(e => console.warn("Native setPipMode failed:", e));
+        }
+    } catch (e) {
+        console.warn("setNativePipMode error:", e);
+    }
+};
+
+const enterNativePip = async () => {
+    try {
+        if (window.Capacitor?.Plugins?.PipPlugin) {
+            const res = await window.Capacitor.Plugins.PipPlugin.enterPip();
+            return !!res?.success;
+        }
+    } catch (e) {
+        console.warn("enterNativePip error:", e);
+    }
+    return false;
+};
+
+const handleNativePipModeChanged = (isInPip) => {
+    if (isInPip) {
+        if (elements.callOverlay?.classList.contains('minimized')) {
+            wasInAppMinimizedBeforeNativePip = true;
+            elements.callOverlay.classList.remove('minimized');
+        } else {
+            wasInAppMinimizedBeforeNativePip = false;
+        }
+        document.body.classList.add('native-pip');
+        elements.callOverlay?.classList.add('native-pip');
+    } else {
+        document.body.classList.remove('native-pip');
+        elements.callOverlay?.classList.remove('native-pip');
+        if (wasInAppMinimizedBeforeNativePip) {
+            elements.callOverlay?.classList.add('minimized');
+            wasInAppMinimizedBeforeNativePip = false;
+        }
+    }
+};
+
+// Listen to native PiP events and floating window actions
+if (typeof window !== 'undefined' && window.Capacitor?.Plugins?.PipPlugin) {
+    try {
+        window.Capacitor.Plugins.PipPlugin.addListener('pipModeChanged', (data) => {
+            handleNativePipModeChanged(Boolean(data?.isInPip));
+        });
+        window.Capacitor.Plugins.PipPlugin.addListener('pipAction', (data) => {
+            if (data?.action === 'endCall') {
+                endCall();
+            }
+        });
+    } catch (e) {
+        console.warn("Failed to register PipPlugin listeners:", e);
+    }
+}
+
 const playRemoteStream = (targetUid, stream, type) => {
     if (!stream) return;
 
@@ -4329,6 +4393,7 @@ const setupWebRTC = async (targetUid, isCaller, type = 'voice') => {
 
                 // Show video call overlay layout elements
                 elements.callOverlay?.classList.add('video-mode');
+                setNativePipMode(true);
                 if (elements.videoContainer) elements.videoContainer.style.display = 'block';
 
                 if (currentCallType === 'video') {
@@ -4573,6 +4638,8 @@ const recordCallInChat = async (partnerUid, callType, status, duration = 0, call
 };
 
 const endCall = async () => {
+    setNativePipMode(false);
+    handleNativePipModeChanged(false);
     resetNativeCallAudio();
     resetLocalVideoPosition();
     elements.callMoreSheet?.classList.remove('show');
@@ -4745,12 +4812,21 @@ const endCall = async () => {
 
 const updatePipButtonVisibility = () => {
     if (!elements.callPipBtn) return;
-    const isSupported = !!document.pictureInPictureEnabled;
+    const isSupported = !!document.pictureInPictureEnabled || Boolean(window.Capacitor?.Plugins?.PipPlugin);
     const shouldShow = currentCallType === 'video' && isSupported;
     elements.callPipBtn.style.display = shouldShow ? 'flex' : 'none';
 };
 
 const togglePiP = async () => {
+    if (window.Capacitor?.Plugins?.PipPlugin) {
+        try {
+            const entered = await enterNativePip();
+            if (entered) return;
+        } catch (nativeErr) {
+            console.warn("Native enterPip error, trying HTML5 PiP fallback:", nativeErr);
+        }
+    }
+
     const video = elements.remoteVideo;
     if (!video || !document.pictureInPictureEnabled) {
         showToast("Picture-in-Picture not supported", "warning");
@@ -5444,6 +5520,7 @@ const retryCallHandshake = async () => {
 const startCallTimer = () => {
     stopCallTimer();
     setNativeCallAudio(currentCallType === 'video', isSpeakerOn);
+    setNativePipMode(currentCallType === 'video' || elements.callOverlay?.classList.contains('video-mode'));
     callStartTime = Date.now();
     callDurationInterval = setInterval(() => {
         if (isReconnecting) {

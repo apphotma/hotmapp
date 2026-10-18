@@ -6865,6 +6865,128 @@ iframe {
     display: flex;
 }
 
+/* Native Android Picture-in-Picture (System Floating Window) */
+body.native-pip {
+    overflow: hidden !important;
+    background: #000 !important;
+}
+
+body.native-pip .call-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #000 !important;
+    z-index: 999999 !important;
+    display: flex !important;
+    cursor: default !important;
+}
+
+body.native-pip .call-overlay .minimize-call-btn,
+body.native-pip .call-overlay .pip-end-call-btn,
+body.native-pip .call-overlay .pip-resize-handle,
+body.native-pip .call-overlay .audio-source-menu,
+body.native-pip .call-overlay .call-more-backdrop,
+body.native-pip .call-overlay .call-more-sheet,
+body.native-pip .minimized-call-bar {
+    display: none !important;
+}
+
+body.native-pip .call-overlay.video-mode .call-content {
+    display: none !important;
+}
+
+body.native-pip .call-overlay.video-mode .video-container {
+    display: flex !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+body.native-pip .call-overlay.video-mode #remote-video {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    position: absolute !important;
+    inset: 0 !important;
+}
+
+body.native-pip .call-overlay.video-mode #local-video {
+    display: block !important;
+    position: absolute !important;
+    bottom: 12px !important;
+    right: 12px !important;
+    top: auto !important;
+    left: auto !important;
+    width: 28% !important;
+    height: auto !important;
+    aspect-ratio: 9/16 !important;
+    object-fit: cover !important;
+    border-radius: 8px !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+    z-index: 60 !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) .call-content {
+    display: flex !important;
+    position: absolute !important;
+    inset: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) .call-controls {
+    display: none !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) .call-avatar-wrapper {
+    width: 68px !important;
+    height: 68px !important;
+    margin: 0 auto 8px !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) .call-avatar {
+    width: 68px !important;
+    height: 68px !important;
+    font-size: 1.7rem !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) .pulse-ring {
+    display: none !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) h2 {
+    font-size: 0.95rem !important;
+    margin: 4px 0 !important;
+    max-width: 90% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: #fff !important;
+}
+
+body.native-pip .call-overlay:not(.video-mode) p {
+    font-size: 0.75rem !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
 .audio-source-menu {
     position: absolute;
     bottom: 130px;
